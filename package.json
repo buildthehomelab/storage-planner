@@ -14,7 +14,7 @@
     "react-dom": "^18"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20250224.0"
+    "@cloudflare/workers-types": "4.20250224.0",
     "@opennextjs/cloudflare": "0.5.3",
     "@types/node": "^20",
     "@types/react": "^18",
