@@ -42,3 +42,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Change package visibility
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.request(`PATCH /user/packages/container/${process.env.IMAGE_NAME}/visibility`, {
+              visibility: 'public'
+          });
