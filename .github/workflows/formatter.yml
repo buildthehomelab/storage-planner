@@ -16,9 +16,9 @@ name: Formate Code
 #############################
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches-ignore: [master]
+    branches-ignore: [main]
     # Remove the line above to run when pull-requesting to master
 
 ###############
