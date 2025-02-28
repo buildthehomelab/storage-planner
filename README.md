@@ -1,0 +1,102 @@
+# Storage Planner
+<div align="center">
+  <img src="https://raw.githubusercontent.com/buildthehomelab/storage-planner/main/public/storage-planner-logo.png" alt="Storage Planner Logo" width="200">
+  <br>
+  <h3>Interactive RAID and Storage Configuration Calculator</h3>
+</div>
+
+## 📋 Overview
+
+Storage Planner is a modern, interactive web application that helps you plan and visualize your storage infrastructure. Whether you're building a home NAS, planning enterprise storage, or just exploring different RAID configurations, this tool helps you make informed decisions.
+
+
+
+## ✨ Features
+
+- **Multiple File System Support**:
+  - ZFS with custom vdev configuration
+  - Unraid with parity drives
+  - Synology SHR and BTRFS
+  - SnapRAID
+  - Standard RAID configurations
+
+- **Interactive Drive Visualization**:
+  - Drag-and-drop drive management
+  - Support for drives from 1TB to 20TB
+  - Create and manage ZFS vdevs visually
+
+- **Detailed Performance Metrics**:
+  - Estimated read/write speeds
+  - Storage efficiency calculations
+  - Reliability scoring
+  - Raw vs. formatted capacity
+
+- **Educational Resources**:
+  - Detailed explanations of RAID types
+  - ZFS vdev configuration guides
+  - SnapRAID functionality overview
+
+## 🚀 Quick Start
+
+### Using Docker
+
+```bash
+docker pull ghcr.io/buildthehomelab/storage-planner:latest
+docker run -p 3000:3000 ghcr.io/buildthehomelab/storage-planner:latest
+```
+
+### Manual Setup
+
+```bash
+git clone https://github.com/buildthehomelab/storage-planner.git
+cd storage-planner
+npm install
+npm run dev
+```
+
+Visit `http://localhost:3000` in your browser.
+
+## 🛠️ Technologies Used
+
+- **Framework**: Next.js 14
+- **UI Framework**: React 18
+- **Styling**: Tailwind CSS
+- **Containerization**: Docker
+
+## 📊 Use Cases
+
+- **Home NAS Planning**: Visualize your home NAS storage configuration before buying hardware
+- **Enterprise Storage Design**: Plan complex ZFS pool arrangements for optimal performance and redundancy
+- **Upgrade Planning**: Calculate the benefits of expanding existing arrays with new drives
+- **Educational Tool**: Learn about different RAID levels and their pros/cons
+
+## 🤝 Contributing
+
+Contributions are welcome! If you'd like to contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please ensure your code follows the existing style and includes appropriate tests.
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgements
+
+- [ZFS Documentation](https://openzfs.github.io/openzfs-docs/)
+- [Synology Knowledge Base](https://www.synology.com/en-global/knowledgebase)
+- [SnapRAID Documentation](https://www.snapraid.it/manual)
+- [Unraid Documentation](https://wiki.unraid.net/)
+
+---
+
+<div align="center">
+  Made with ❤️ for storage enthusiasts and homelab builders everywhere
+  <br>
+  © 2025 Storage Planner
+</div>
