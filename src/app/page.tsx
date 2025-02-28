@@ -232,52 +232,59 @@ const RAIDCalculator = () => {
   
   // Calculate storage stats based on RAID type and selected drives
   const calculateStorage = () => {
-    // If ZFS with vdevs, use vdev calculation
-    if (fileSystem === 'ZFS' && vdevs.length > 0) {
-      // Calculate stats for each vdev
-      const vdevStats = vdevs.map(calculateVdevStorage);
-      
-      // In a ZFS pool with multiple vdevs, the total available space is the sum of 
-      // the available space in each vdev (for striped vdevs, which is the default)
-      const totalRawStorage = vdevStats.reduce((sum, stat) => sum + stat.total, 0);
-      const available = vdevStats.reduce((sum, stat) => sum + stat.available, 0);
-      const protection = vdevStats.reduce((sum, stat) => sum + stat.protection, 0);
-      
-      // ZFS pool read performance scales with multiple vdevs but with diminishing returns
-      let readSpeed = 0;
-        if (vdevStats.length > 0) {
-        // Base calculation - sum of read speeds
-        const baseReadSpeed = vdevStats.reduce((sum, stat) => sum + stat.readSpeed, 0);
-        
-        // Apply diminishing returns factor based on number of vdevs
-        // Efficiency decreases as the number of vdevs increases
-        const diminishingFactor = Math.max(0.6, 1 - (vdevStats.length * 0.05));
-        readSpeed = baseReadSpeed * diminishingFactor;
-      }
+  // If ZFS with vdevs, use vdev calculation
+  if (fileSystem === 'ZFS' && vdevs.length > 0) {
+  // Calculate stats for each vdev
+  const vdevStats = vdevs.map(calculateVdevStorage);
+  
+  // In a ZFS pool with multiple vdevs, the total available space is the sum of 
+  // the available space in each vdev (for striped vdevs, which is the default)
+  const totalRawStorage = vdevStats.reduce((sum, stat) => sum + stat.total, 0);
+  const available = vdevStats.reduce((sum, stat) => sum + stat.available, 0);
+  const protection = vdevStats.reduce((sum, stat) => sum + stat.protection, 0);
+  
+  // Replace the existing read speed calculation with this improved version:
+  let readSpeed = 0;
+  if (vdevStats.length > 0) {
+    // Base calculation - still sum the read speeds as before
+    const baseReadSpeed = vdevStats.reduce((sum, stat) => sum + stat.readSpeed, 0);
+    
+    // Improved diminishing returns formula - starts higher and decreases more gradually
+    // Starting factor is 0.95 and decreases by 0.03 per vdev
+    const diminishingFactor = Math.max(0.7, 0.95 - (vdevStats.length * 0.03));
+    readSpeed = baseReadSpeed * diminishingFactor;
+  }
 
-      // ZFS pool write performance is limited by the slowest vdev
-      // With a small parallelism benefit as vdev count increases
-      const writeSpeed = vdevStats.length > 0 ? 
-        Math.min(...vdevStats.map(stat => stat.writeSpeed)) * 
-        Math.min(1.0, 0.75 + (vdevStats.length * 0.03)) : 0;
-      
-      // Overall reliability is limited by the least reliable vdev
-      const reliability = vdevStats.length > 0 ? 
-        Math.min(...vdevStats.map(stat => stat.reliability)) : 0;
-      
-      // Calculate formatted capacity based on file system overhead
-      const overheadPercentage = 0.08; // ZFS typically has 5-10% overhead
-      const formatted = Math.max(0, available) * (1 - overheadPercentage);
-      
-      return { 
-        total: totalRawStorage, 
-        available, 
-        protection,
-        formatted,
-        readSpeed: Math.max(0, Math.round(readSpeed)),
-        writeSpeed: Math.max(0, Math.round(writeSpeed)),
-        reliability
-      };
+  // Replace the existing write speed calculation with this improved version:
+  let writeSpeed = 0;
+  if (vdevStats.length > 0) {
+    // Calculate average write speed across vdevs
+    const avgWriteSpeed = vdevStats.reduce((sum, stat) => sum + stat.writeSpeed, 0) / vdevStats.length;
+    
+    // Apply a more significant boost based on vdev count
+    // Starting at 0.9 and increasing by 0.15 per vdev, capped at 1.8x
+    const parallelismBoost = Math.min(1.8, 0.9 + (vdevStats.length * 0.15));
+    writeSpeed = avgWriteSpeed * parallelismBoost;
+  }
+  
+  // Rest of the function remains the same...
+  // Overall reliability is limited by the least reliable vdev
+  const reliability = vdevStats.length > 0 ? 
+    Math.min(...vdevStats.map(stat => stat.reliability)) : 0;
+  
+  // Calculate formatted capacity based on file system overhead
+  const overheadPercentage = 0.08; // ZFS typically has 5-10% overhead
+  const formatted = Math.max(0, available) * (1 - overheadPercentage);
+  
+  return { 
+    total: totalRawStorage, 
+    available, 
+    protection,
+    formatted,
+    readSpeed: Math.max(0, Math.round(readSpeed)),
+    writeSpeed: Math.max(0, Math.round(writeSpeed)),
+    reliability
+  };
     } else {
       // Standard calculation for non-ZFS or ZFS without vdevs
       if (selectedDrives.length === 0) return { 
