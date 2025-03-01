@@ -10,7 +10,7 @@
 Storage Planner is a modern, interactive web application that helps you plan and visualize your storage infrastructure. Whether you're building a home NAS, planning enterprise storage, or just exploring different RAID configurations, this tool helps you make informed decisions.
 
 <div align="center">
-  <img src="https://github.com/buildthehomelab/storage-planner/blob/main/public/storage-planner.gif"  width="200">
+  <img src="https://github.com/buildthehomelab/storage-planner/blob/main/public/storage-planner.gif"  width="400">
   <br>
   <h3>Interactive RAID and Storage Configuration Calculator</h3>
 </div>
