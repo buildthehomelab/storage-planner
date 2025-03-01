@@ -16,6 +16,11 @@ RUN npm install
 # Copy all files
 COPY . .
 
+# Configure next.js to use babel when SWC is not available
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_WEBPACK_USEPOLLING 1
+ENV NEXT_SWC_MINIFY 0
+
 # Build the app
 RUN npm run build
 
@@ -24,6 +29,10 @@ FROM node:18-alpine AS production
 
 # Set working directory
 WORKDIR /app
+
+# Set environment variables for production
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 
 # Copy necessary files from build stage
 COPY --from=build /app/package*.json ./
