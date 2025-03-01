@@ -11,8 +11,6 @@ Storage Planner is a modern, interactive web application that helps you plan and
 
 <div align="center">
   <img src="https://github.com/buildthehomelab/storage-planner/blob/main/public/storage-planner.gif"  width="400">
-  <br>
-  <h3>Interactive RAID and Storage Configuration Calculator</h3>
 </div>
 
 ## ✨ Features
@@ -26,7 +24,7 @@ Storage Planner is a modern, interactive web application that helps you plan and
 
 - **Interactive Drive Visualization**:
   - Drag-and-drop drive management
-  - Support for drives from 1TB to 20TB
+  - Support for drives from 1TB to 30TB
   - Create and manage ZFS vdevs visually
 
 - **Detailed Performance Metrics**:
@@ -48,16 +46,6 @@ Storage Planner is a modern, interactive web application that helps you plan and
 docker pull ghcr.io/buildthehomelab/storage-planner:latest
 docker run -p 3000:3000 ghcr.io/buildthehomelab/storage-planner:latest
 ```
-
-### Manual Setup
-
-```bash
-git clone https://github.com/buildthehomelab/storage-planner.git
-cd storage-planner
-npm install
-npm run dev
-```
-
 Visit `http://localhost:3000` in your browser.
 
 ## 🏗️ Platform Support
