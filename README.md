@@ -13,6 +13,27 @@ Storage Planner is a modern, interactive web application that helps you plan and
   <img src="https://github.com/buildthehomelab/storage-planner/blob/main/public/storage-planner.gif"  width="400">
 </div>
 
+
+## 🏗️ Platform Support
+
+Storage Planner Docker images are built for multiple architectures:
+
+- `linux/amd64` - Standard x86_64 systems
+- `linux/arm64` - 64-bit ARM (ARMv8) systems like Raspberry Pi 4, AWS Graviton, and Apple Silicon
+- `linux/arm/v7` - 32-bit ARM systems like Raspberry Pi 3 and earlier
+
+This means you can run Storage Planner on various hardware without additional configuration. Docker will automatically pull the correct image for your architecture.
+
+## 🚀 Quick Start
+
+### Using Docker
+
+```bash
+docker pull ghcr.io/buildthehomelab/storage-planner:latest
+docker run -p 3000:3000 ghcr.io/buildthehomelab/storage-planner:latest
+```
+Visit `http://localhost:3000` in your browser.
+
 ## ✨ Features
 
 - **Multiple File System Support**:
@@ -37,26 +58,6 @@ Storage Planner is a modern, interactive web application that helps you plan and
   - Detailed explanations of RAID types
   - ZFS vdev configuration guides
   - SnapRAID functionality overview
-
-## 🚀 Quick Start
-
-### Using Docker
-
-```bash
-docker pull ghcr.io/buildthehomelab/storage-planner:latest
-docker run -p 3000:3000 ghcr.io/buildthehomelab/storage-planner:latest
-```
-Visit `http://localhost:3000` in your browser.
-
-## 🏗️ Platform Support
-
-Storage Planner Docker images are built for multiple architectures:
-
-- `linux/amd64` - Standard x86_64 systems
-- `linux/arm64` - 64-bit ARM (ARMv8) systems like Raspberry Pi 4, AWS Graviton, and Apple Silicon
-- `linux/arm/v7` - 32-bit ARM systems like Raspberry Pi 3 and earlier
-
-This means you can run Storage Planner on a wide variety of hardware without any additional configuration. Docker will automatically pull the correct image for your architecture.
 
 ## 🛠️ Technologies Used
 
