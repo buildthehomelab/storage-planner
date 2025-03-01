@@ -1,14 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  // Use 'basePath' if you're not hosting at the root of your domain
-  // basePath: '/storage-planner',
-  // Use 'images.unoptimized' for static export
-  images: {
-    unoptimized: true,
+  output: process.env.EXPORT_MODE === 'true' ? 'export' : 'standalone',
+  // For GitHub Pages deployment
+  ...(process.env.EXPORT_MODE === 'true' && {
+    images: {
+      unoptimized: true,
+    },
+    trailingSlash: true,
+  }),
+  // For regular Next.js deployment
+  experimental: {
+    outputFileTracingRoot: process.env.NODE_ENV === 'production' ? undefined : __dirname,
   },
-  // GitHub Pages adds a trailing slash by default
-  trailingSlash: true,
 }
 
 module.exports = nextConfig

@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:static": "EXPORT_MODE=true next build",
     "start": "next start",
-    "lint": "next lint",
-    "export": "next build && next export"
+    "start:static": "npx serve out",
+    "lint": "next lint"
   },
   "dependencies": {
     "next": "14.0.0",
