@@ -11,10 +11,10 @@ const nextConfig = {
     
     // Add a basePath equal to your repository name (only needed for project pages)
     // Remove this line if you're deploying to a custom domain or using username.github.io repository
-    // basePath: '/storage-planner',
+    basePath: '/storage-planner',
     
     // This ensures assets are loaded from the correct path in GitHub Pages
-    // assetPrefix: '/storage-planner/',
+    assetPrefix: '/storage-planner/',
   }),
   
   // For regular Next.js deployment
