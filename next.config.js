@@ -1,11 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  // Ensures Next.js can work properly in Docker environments
-  experimental: {
-    // This is experimental but stable
-    outputFileTracingRoot: process.env.NODE_ENV === 'production' ? undefined : __dirname,
+  output: 'export',
+  // Use 'basePath' if you're not hosting at the root of your domain
+  // basePath: '/storage-planner',
+  // Use 'images.unoptimized' for static export
+  images: {
+    unoptimized: true,
   },
+  // GitHub Pages adds a trailing slash by default
+  trailingSlash: true,
 }
 
 module.exports = nextConfig
