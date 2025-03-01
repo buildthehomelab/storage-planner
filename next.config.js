@@ -14,7 +14,7 @@ const nextConfig = {
     // basePath: '/storage-planner',
     
     // This ensures assets are loaded from the correct path in GitHub Pages
-    assetPrefix: '/storage-planner/',
+    // assetPrefix: '/storage-planner/',
   }),
   
   // For regular Next.js deployment
