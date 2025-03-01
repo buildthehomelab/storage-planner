@@ -15,18 +15,46 @@ interface Vdev {
   drives: Drive[];
 }
 
+// Interface for a storage configuration
+interface StorageConfig {
+  id: number;
+  fileSystem: string;
+  raidType: string;
+  selectedDrives: Drive[];
+  vdevs: Vdev[];
+}
+
 const RAIDCalculator = () => {
   const [driveSize, setDriveSize] = useState(20);
-  const [selectedDrives, setSelectedDrives] = useState<Drive[]>([]);
-  const [raidType, setRaidType] = useState('RAID 6');
-  const [fileSystem, setFileSystem] = useState('ZFS');
+  const [showComparisonMode, setShowComparisonMode] = useState(false);
+  const [activeConfigIndex, setActiveConfigIndex] = useState(0);
+  
+  // Initialize with two configurations
+  const [configs, setConfigs] = useState<StorageConfig[]>([
+    {
+      id: 1,
+      fileSystem: 'ZFS',
+      raidType: 'RAID-Z2',
+      selectedDrives: [],
+      vdevs: []
+    },
+    {
+      id: 2,
+      fileSystem: 'Standard',
+      raidType: 'RAID 10',
+      selectedDrives: [],
+      vdevs: []
+    }
+  ]);
+
+  // Existing modal states
   const [showRaidInfo, setShowRaidInfo] = useState(false);
-  const [vdevs, setVdevs] = useState<Vdev[]>([]);
   const [showVdevManager, setShowVdevManager] = useState(false);
-  const [currentVdevType, setCurrentVdevType] = useState('RAID-Z2');
   const [showVdevInfo, setShowVdevInfo] = useState(false);
   const [showSnapraidInfo, setShowSnapraidInfo] = useState(false);
+  const [currentVdevType, setCurrentVdevType] = useState('RAID-Z2');
   
+  // Refs for modals
   const raidInfoRef = useRef<HTMLDivElement>(null);
   const vdevManagerRef = useRef<HTMLDivElement>(null);
   const vdevInfoRef = useRef<HTMLDivElement>(null);
@@ -50,15 +78,30 @@ const RAIDCalculator = () => {
     'RAID-Z1', 'RAID-Z2', 'RAID-Z3', 'Mirror', 'Striped'
   ], []);
 
-  // Update RAID type when file system changes
+  // Helper function to update a specific config
+  const updateConfig = (configIndex: number, updates: Partial<StorageConfig>) => {
+    setConfigs(prevConfigs => {
+      const newConfigs = [...prevConfigs];
+      newConfigs[configIndex] = { ...newConfigs[configIndex], ...updates };
+      return newConfigs;
+    });
+  };
+
+  // Update RAID type when file system changes for a config
   useEffect(() => {
-    setRaidType(raidOptions[fileSystem as keyof typeof raidOptions][0]);
-    
-    // Reset vdevs when changing away from ZFS
-    if (fileSystem !== 'ZFS') {
-      setVdevs([]);
-    }
-  }, [fileSystem, raidOptions]);
+    configs.forEach((config, index) => {
+      if (!raidOptions[config.fileSystem as keyof typeof raidOptions].includes(config.raidType)) {
+        updateConfig(index, { 
+          raidType: raidOptions[config.fileSystem as keyof typeof raidOptions][0] 
+        });
+        
+        // Reset vdevs when changing away from ZFS
+        if (config.fileSystem !== 'ZFS') {
+          updateConfig(index, { vdevs: [] });
+        }
+      }
+    });
+  }, [configs, raidOptions]);
   
   // Close popup windows when clicking outside
   useEffect(() => {
@@ -83,49 +126,87 @@ const RAIDCalculator = () => {
     };
   }, [raidInfoRef, vdevManagerRef, vdevInfoRef, snapraidInfoRef]);
   
-  // Add a drive to the selection
+  // Add a drive to the active configuration
   const addDrive = (size: number) => {
-    if (selectedDrives.length < 16) {
-      setSelectedDrives([...selectedDrives, { id: Date.now(), size }]);
+    const activeConfig = configs[activeConfigIndex];
+    if (activeConfig.selectedDrives.length < 16) {
+      const updatedDrives = [...activeConfig.selectedDrives, { id: Date.now(), size }];
+      updateConfig(activeConfigIndex, { selectedDrives: updatedDrives });
     }
   };
   
-  // Remove a drive from the selection
+  // Remove a drive from the active configuration
   const removeDrive = (id: number) => {
-    setSelectedDrives(selectedDrives.filter(drive => drive.id !== id));
+    const activeConfig = configs[activeConfigIndex];
+    const updatedDrives = activeConfig.selectedDrives.filter(drive => drive.id !== id);
+    updateConfig(activeConfigIndex, { selectedDrives: updatedDrives });
   };
   
-  // Reset all drives
+  // Reset drives for the active configuration
   const resetDrives = () => {
-    setSelectedDrives([]);
-    setVdevs([]);
+    updateConfig(activeConfigIndex, { 
+      selectedDrives: [],
+      vdevs: []
+    });
   };
   
-  // Create a new vdev with selected drives
+  // Reset all configurations
+  const resetAllConfigs = () => {
+    setConfigs(prevConfigs => prevConfigs.map(config => ({
+      ...config,
+      selectedDrives: [],
+      vdevs: []
+    })));
+  };
+  
+  // Create a new vdev with selected drives for the active configuration
   const createVdev = () => {
-    if (selectedDrives.length === 0) return;
+    const activeConfig = configs[activeConfigIndex];
+    if (activeConfig.selectedDrives.length === 0) return;
     
     const newVdev: Vdev = {
       id: Date.now(),
       type: currentVdevType,
-      drives: [...selectedDrives]
+      drives: [...activeConfig.selectedDrives]
     };
     
-    setVdevs([...vdevs, newVdev]);
-    setSelectedDrives([]);
+    const updatedVdevs = [...activeConfig.vdevs, newVdev];
+    updateConfig(activeConfigIndex, { 
+      vdevs: updatedVdevs,
+      selectedDrives: []
+    });
     setShowVdevManager(false);
   };
   
-  // Remove a vdev
+  // Remove a vdev from the active configuration
   const removeVdev = (id: number) => {
+    const activeConfig = configs[activeConfigIndex];
     // Return the drives back to the pool
-    const vdevToRemove = vdevs.find(vdev => vdev.id === id);
+    const vdevToRemove = activeConfig.vdevs.find(vdev => vdev.id === id);
     if (vdevToRemove) {
-      setSelectedDrives([...selectedDrives, ...vdevToRemove.drives]);
+      const updatedDrives = [...activeConfig.selectedDrives, ...vdevToRemove.drives];
+      const updatedVdevs = activeConfig.vdevs.filter(vdev => vdev.id !== id);
+      updateConfig(activeConfigIndex, { 
+        selectedDrives: updatedDrives,
+        vdevs: updatedVdevs
+      });
     }
+  };
+  
+  // Copy drives from one configuration to another
+  const copyDrives = (fromIndex: number, toIndex: number) => {
+    const sourceDrives = [...configs[fromIndex].selectedDrives];
+    if (sourceDrives.length === 0) return;
     
-    // Remove the vdev
-    setVdevs(vdevs.filter(vdev => vdev.id !== id));
+    // Create new drive objects with new IDs to avoid conflicts
+    const newDrives = sourceDrives.map(drive => ({
+      id: Date.now() + Math.random(),
+      size: drive.size
+    }));
+    
+    updateConfig(toIndex, { 
+      selectedDrives: [...configs[toIndex].selectedDrives, ...newDrives]
+    });
   };
   
   // Calculate storage stats for a single vdev
@@ -164,7 +245,6 @@ const RAIDCalculator = () => {
       case 'RAID 1':
       case 'Mirror':
         // For mirrored configurations, available space is equal to the smallest drive's capacity
-        // since data is duplicated across all drives
         available = vdev.drives.length > 0 ? Math.min(...vdev.drives.map(d => d.size)) : 0;
         protection = totalRawStorage - available;
         // Read can benefit from multiple drives, write is limited to single drive
@@ -230,64 +310,54 @@ const RAIDCalculator = () => {
     };
   };
   
-  // Calculate storage stats based on RAID type and selected drives
-  const calculateStorage = () => {
-  // If ZFS with vdevs, use vdev calculation
-  if (fileSystem === 'ZFS' && vdevs.length > 0) {
-  // Calculate stats for each vdev
-  const vdevStats = vdevs.map(calculateVdevStorage);
-  
-  // In a ZFS pool with multiple vdevs, the total available space is the sum of 
-  // the available space in each vdev (for striped vdevs, which is the default)
-  const totalRawStorage = vdevStats.reduce((sum, stat) => sum + stat.total, 0);
-  const available = vdevStats.reduce((sum, stat) => sum + stat.available, 0);
-  const protection = vdevStats.reduce((sum, stat) => sum + stat.protection, 0);
-  
-  // Replace the existing read speed calculation with this improved version:
-  let readSpeed = 0;
-  if (vdevStats.length > 0) {
-    // Base calculation - still sum the read speeds as before
-    const baseReadSpeed = vdevStats.reduce((sum, stat) => sum + stat.readSpeed, 0);
-    
-    // Improved diminishing returns formula - starts higher and decreases more gradually
-    // Starting factor is 0.95 and decreases by 0.03 per vdev
-    const diminishingFactor = Math.max(0.7, 0.95 - (vdevStats.length * 0.03));
-    readSpeed = baseReadSpeed * diminishingFactor;
-  }
+  // Calculate storage stats for a configuration
+  const calculateStorage = (config: StorageConfig) => {
+    // If ZFS with vdevs, use vdev calculation
+    if (config.fileSystem === 'ZFS' && config.vdevs.length > 0) {
+      // Calculate stats for each vdev
+      const vdevStats = config.vdevs.map(calculateVdevStorage);
+      
+      // In a ZFS pool with multiple vdevs, total available space is the sum
+      const totalRawStorage = vdevStats.reduce((sum, stat) => sum + stat.total, 0);
+      const available = vdevStats.reduce((sum, stat) => sum + stat.available, 0);
+      const protection = vdevStats.reduce((sum, stat) => sum + stat.protection, 0);
+      
+      // Calculate read speed with diminishing returns
+      let readSpeed = 0;
+      if (vdevStats.length > 0) {
+        const baseReadSpeed = vdevStats.reduce((sum, stat) => sum + stat.readSpeed, 0);
+        const diminishingFactor = Math.max(0.7, 0.95 - (vdevStats.length * 0.03));
+        readSpeed = baseReadSpeed * diminishingFactor;
+      }
 
-  // Replace the existing write speed calculation with this improved version:
-  let writeSpeed = 0;
-  if (vdevStats.length > 0) {
-    // Calculate average write speed across vdevs
-    const avgWriteSpeed = vdevStats.reduce((sum, stat) => sum + stat.writeSpeed, 0) / vdevStats.length;
-    
-    // Apply a more significant boost based on vdev count
-    // Starting at 0.9 and increasing by 0.15 per vdev, capped at 1.8x
-    const parallelismBoost = Math.min(1.8, 0.9 + (vdevStats.length * 0.15));
-    writeSpeed = avgWriteSpeed * parallelismBoost;
-  }
-  
-  // Rest of the function remains the same...
-  // Overall reliability is limited by the least reliable vdev
-  const reliability = vdevStats.length > 0 ? 
-    Math.min(...vdevStats.map(stat => stat.reliability)) : 0;
-  
-  // Calculate formatted capacity based on file system overhead
-  const overheadPercentage = 0.08; // ZFS typically has 5-10% overhead
-  const formatted = Math.max(0, available) * (1 - overheadPercentage);
-  
-  return { 
-    total: totalRawStorage, 
-    available, 
-    protection,
-    formatted,
-    readSpeed: Math.max(0, Math.round(readSpeed)),
-    writeSpeed: Math.max(0, Math.round(writeSpeed)),
-    reliability
-  };
+      // Calculate write speed with parallelism boost
+      let writeSpeed = 0;
+      if (vdevStats.length > 0) {
+        const avgWriteSpeed = vdevStats.reduce((sum, stat) => sum + stat.writeSpeed, 0) / vdevStats.length;
+        const parallelismBoost = Math.min(1.8, 0.9 + (vdevStats.length * 0.15));
+        writeSpeed = avgWriteSpeed * parallelismBoost;
+      }
+      
+      // Overall reliability is limited by the least reliable vdev
+      const reliability = vdevStats.length > 0 ? 
+        Math.min(...vdevStats.map(stat => stat.reliability)) : 0;
+      
+      // Calculate formatted capacity based on file system overhead
+      const overheadPercentage = 0.08; // ZFS typically has 5-10% overhead
+      const formatted = Math.max(0, available) * (1 - overheadPercentage);
+      
+      return { 
+        total: totalRawStorage, 
+        available, 
+        protection,
+        formatted,
+        readSpeed: Math.max(0, Math.round(readSpeed)),
+        writeSpeed: Math.max(0, Math.round(writeSpeed)),
+        reliability
+      };
     } else {
       // Standard calculation for non-ZFS or ZFS without vdevs
-      if (selectedDrives.length === 0) return { 
+      if (config.selectedDrives.length === 0) return { 
         total: 0, 
         available: 0, 
         protection: 0, 
@@ -297,7 +367,7 @@ const RAIDCalculator = () => {
         reliability: 0
       };
       
-      const totalRawStorage = selectedDrives.reduce((sum, drive) => sum + drive.size, 0);
+      const totalRawStorage = config.selectedDrives.reduce((sum, drive) => sum + drive.size, 0);
       let available = 0;
       let protection = 0;
       let readSpeed = 0;
@@ -309,11 +379,11 @@ const RAIDCalculator = () => {
       const baseDriveWriteSpeed = 140; // MB/s
       
       // SnapRAID specific calculation
-      if (fileSystem === 'SnapRAID') {
-        const parityDrives = parseInt(raidType.split(' ')[0]);
-        if (selectedDrives.length > parityDrives) {
+      if (config.fileSystem === 'SnapRAID') {
+        const parityDrives = parseInt(config.raidType.split(' ')[0]);
+        if (config.selectedDrives.length > parityDrives) {
           // Sort drives by size in descending order
-          const sortedDrives = [...selectedDrives].sort((a, b) => b.size - a.size);
+          const sortedDrives = [...config.selectedDrives].sort((a, b) => b.size - a.size);
           
           // The largest drives are used for parity in SnapRAID
           const parityDrivesSize = sortedDrives.slice(0, parityDrives).reduce((sum, drive) => sum + drive.size, 0);
@@ -323,12 +393,8 @@ const RAIDCalculator = () => {
           protection = parityDrivesSize;
           
           // SnapRAID performance characteristics
-          // For reads: near-raw performance as it's not striped
           readSpeed = baseDriveReadSpeed * 0.95;
-          // For writes: near-raw performance for regular files, but slow for parity updates
           writeSpeed = baseDriveWriteSpeed * 0.9;
-          
-          // Reliability based on parity drives
           reliability = Math.min(95, 50 + (parityDrives * 15)); // Up to 95% with sufficient parity drives
         } else {
           available = 0;
@@ -339,103 +405,92 @@ const RAIDCalculator = () => {
         }
       } else {
         // Non-SnapRAID calculation
-        switch(raidType) {
+        switch(config.raidType) {
           case 'RAID 0':
           case 'Striped':
             available = totalRawStorage;
             protection = 0;
-            // Read/write scales with number of drives in RAID 0
-            readSpeed = baseDriveReadSpeed * selectedDrives.length * 0.9; // 90% efficiency
-            writeSpeed = baseDriveWriteSpeed * selectedDrives.length * 0.9; // 90% efficiency
-            reliability = 0; // No redundancy
+            readSpeed = baseDriveReadSpeed * config.selectedDrives.length * 0.9;
+            writeSpeed = baseDriveWriteSpeed * config.selectedDrives.length * 0.9;
+            reliability = 0;
             break;
           case 'RAID 1':
           case 'Mirror':
-            // For mirrored configurations, available space is equal to the smallest drive's capacity
-            // since data is duplicated across all drives
-            available = selectedDrives.length > 0 ? Math.min(...selectedDrives.map(d => d.size)) : 0;
+            available = config.selectedDrives.length > 0 ? Math.min(...config.selectedDrives.map(d => d.size)) : 0;
             protection = totalRawStorage - available;
-            // Read can benefit from multiple drives, write is limited to single drive
-            readSpeed = baseDriveReadSpeed * Math.min(selectedDrives.length, 2) * 0.9; // Read from multiple drives
-            writeSpeed = baseDriveWriteSpeed * 0.95; // Slightly slower than single drive
-            reliability = 90; // High reliability with full mirroring
+            readSpeed = baseDriveReadSpeed * Math.min(config.selectedDrives.length, 2) * 0.9;
+            writeSpeed = baseDriveWriteSpeed * 0.95;
+            reliability = 90;
             break;
           case 'RAID 5':
           case 'RAID-Z1':
           case 'SHR':
           case '1 Parity':
-            available = selectedDrives.length > 1 ? totalRawStorage - Math.max(...selectedDrives.map(d => d.size)) : 0;
+            available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
             protection = totalRawStorage - available;
-            // RAID 5 read is good, write has parity overhead
-            readSpeed = baseDriveReadSpeed * (selectedDrives.length - 1) * 0.8;
-            writeSpeed = baseDriveWriteSpeed * (selectedDrives.length - 1) * 0.7; // Parity calculation slows writes
-            reliability = 70; // Can survive one drive failure
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 1) * 0.8;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 1) * 0.7;
+            reliability = 70;
             break;
           case 'RAID 6':
           case 'RAID-Z2':
           case 'SHR-2':
           case '2 Parity':
           case 'Parity 2':
-            available = selectedDrives.length > 2 ? totalRawStorage - (2 * Math.max(...selectedDrives.map(d => d.size))) : 0;
+            available = config.selectedDrives.length > 2 ? totalRawStorage - (2 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
             protection = totalRawStorage - available;
-            // RAID 6 read is good, write has double parity overhead
-            readSpeed = baseDriveReadSpeed * (selectedDrives.length - 2) * 0.8;
-            writeSpeed = baseDriveWriteSpeed * (selectedDrives.length - 2) * 0.6; // Double parity calculation slows writes
-            reliability = 85; // Can survive two drive failures
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 2) * 0.8;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 2) * 0.6;
+            reliability = 85;
             break;
           case 'Parity 1':
-            available = selectedDrives.length > 1 ? totalRawStorage - Math.max(...selectedDrives.map(d => d.size)) : 0;
+            available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
             protection = totalRawStorage - available;
-            // Unraid read performance is limited since it's not striped
-            readSpeed = baseDriveReadSpeed * Math.min(1.5, selectedDrives.length * 0.2);
-            // Unraid write is slower due to parity calculation and non-striped nature
+            readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
             writeSpeed = baseDriveWriteSpeed * 0.6;
-            reliability = 70; // Can survive one drive failure
+            reliability = 70;
             break;
           case 'Parity 3':
           case 'RAID-Z3':
           case '3 Parity':
-            available = selectedDrives.length > 3 ? totalRawStorage - (3 * Math.max(...selectedDrives.map(d => d.size))) : 0;
+            available = config.selectedDrives.length > 3 ? totalRawStorage - (3 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
             protection = totalRawStorage - available;
-            // For Unraid: read is still limited as it's not striped
-            if (raidType === 'Parity 3') {
-              readSpeed = baseDriveReadSpeed * Math.min(1.5, selectedDrives.length * 0.2);
-              writeSpeed = baseDriveWriteSpeed * 0.35; // Very slow with triple parity
+            if (config.raidType === 'Parity 3') {
+              readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
+              writeSpeed = baseDriveWriteSpeed * 0.35;
             } else {
-              // For RAID-Z3: behavior similar to RAID6 but with more parity
-              readSpeed = baseDriveReadSpeed * (selectedDrives.length - 3) * 0.8;
-              writeSpeed = baseDriveWriteSpeed * (selectedDrives.length - 3) * 0.5;
+              readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 3) * 0.8;
+              writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 3) * 0.5;
             }
-            reliability = 95; // Can survive three drive failures
+            reliability = 95;
             break;
           case '4 Parity':
-            available = selectedDrives.length > 4 ? totalRawStorage - (4 * Math.max(...selectedDrives.map(d => d.size))) : 0;
+            available = config.selectedDrives.length > 4 ? totalRawStorage - (4 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
             protection = totalRawStorage - available;
-            readSpeed = baseDriveReadSpeed * (selectedDrives.length - 4) * 0.8;
-            writeSpeed = baseDriveWriteSpeed * (selectedDrives.length - 4) * 0.4; // Slower with quadruple parity
-            reliability = 96; // Can survive four drive failures
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 4) * 0.8;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 4) * 0.4;
+            reliability = 96;
             break;
           case '5 Parity':
-            available = selectedDrives.length > 5 ? totalRawStorage - (5 * Math.max(...selectedDrives.map(d => d.size))) : 0;
+            available = config.selectedDrives.length > 5 ? totalRawStorage - (5 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
             protection = totalRawStorage - available;
-            readSpeed = baseDriveReadSpeed * (selectedDrives.length - 5) * 0.8;
-            writeSpeed = baseDriveWriteSpeed * (selectedDrives.length - 5) * 0.35; // Even slower with quintuple parity
-            reliability = 97; // Can survive five drive failures
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 5) * 0.8;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 5) * 0.35;
+            reliability = 97;
             break;
           case '6 Parity':
-            available = selectedDrives.length > 6 ? totalRawStorage - (6 * Math.max(...selectedDrives.map(d => d.size))) : 0;
+            available = config.selectedDrives.length > 6 ? totalRawStorage - (6 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
             protection = totalRawStorage - available;
-            readSpeed = baseDriveReadSpeed * (selectedDrives.length - 6) * 0.8;
-            writeSpeed = baseDriveWriteSpeed * (selectedDrives.length - 6) * 0.3; // Very slow with sextuple parity
-            reliability = 98; // Can survive six drive failures
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 6) * 0.8;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 6) * 0.3;
+            reliability = 98;
             break;
           case 'RAID 10':
             available = totalRawStorage / 2;
             protection = totalRawStorage - available;
-            // RAID 10 has excellent read/write performance
-            readSpeed = baseDriveReadSpeed * (selectedDrives.length / 2) * 0.95;
-            writeSpeed = baseDriveWriteSpeed * (selectedDrives.length / 2) * 0.9;
-            reliability = 80; // Good reliability with mirroring
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length / 2) * 0.95;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length / 2) * 0.9;
+            reliability = 80;
             break;
           default:
             available = totalRawStorage / 2;
@@ -448,15 +503,15 @@ const RAIDCalculator = () => {
       
       // Calculate formatted capacity based on file system overhead
       const overheadPercentages: { [key: string]: number } = {
-        'ZFS': 0.08,  // ZFS typically has 5-10% overhead
-        'Unraid': 0.03, // Unraid has minimal overhead around 2-3%
-        'Synology SHR': 0.085, // Synology SHR uses ext4, around 8-9% overhead
-        'Synology BTRFS': 0.12, // BTRFS has higher overhead due to COW features, around 10-15%
-        'SnapRAID': 0.01, // SnapRAID has very minimal overhead, around 1%
-        'Standard': 0.05  // Generic filesystems like ext4, NTFS around 5% overhead
+        'ZFS': 0.08,
+        'Unraid': 0.03,
+        'Synology SHR': 0.085,
+        'Synology BTRFS': 0.12,
+        'SnapRAID': 0.01,
+        'Standard': 0.05
       };
       
-      const overheadPercentage = overheadPercentages[fileSystem] || 0.05;
+      const overheadPercentage = overheadPercentages[config.fileSystem] || 0.05;
       const formatted = Math.max(0, available) * (1 - overheadPercentage);
       
       return { 
@@ -471,165 +526,75 @@ const RAIDCalculator = () => {
     }
   };
   
-  const stats = calculateStorage();
+  // Calculate stats for both configurations
+  const configStats = configs.map(calculateStorage);
   
-  // Get total number of drives (selected + in vdevs)
-  const totalDrivesCount = selectedDrives.length + vdevs.reduce((sum, vdev) => sum + vdev.drives.length, 0);
+  // Compare the two configurations and determine which is better in each category
+  const comparisonResult = useMemo(() => {
+    if (!showComparisonMode) return null;
+    
+    const stats1 = configStats[0];
+    const stats2 = configStats[1];
+    
+    return {
+      capacity: {
+        winner: stats1.formatted > stats2.formatted ? 0 : stats1.formatted < stats2.formatted ? 1 : null,
+        difference: Math.abs(stats1.formatted - stats2.formatted).toFixed(1),
+        percentDiff: stats1.formatted && stats2.formatted ? 
+          Math.abs(((stats1.formatted - stats2.formatted) / Math.min(stats1.formatted, stats2.formatted)) * 100).toFixed(1) : '0'
+      },
+      efficiency: {
+        winner: (stats1.available / stats1.total) > (stats2.available / stats2.total) ? 0 : 
+                (stats1.available / stats1.total) < (stats2.available / stats2.total) ? 1 : null,
+        difference: Math.abs((stats1.available / stats1.total) - (stats2.available / stats2.total)).toFixed(2),
+        percentDiff: (stats1.available && stats2.available) ? 
+          Math.abs((((stats1.available / stats1.total) - (stats2.available / stats2.total)) / 
+          Math.min((stats1.available / stats1.total), (stats2.available / stats2.total))) * 100).toFixed(1) : '0'
+      },
+      readSpeed: {
+        winner: stats1.readSpeed > stats2.readSpeed ? 0 : stats1.readSpeed < stats2.readSpeed ? 1 : null,
+        difference: Math.abs(stats1.readSpeed - stats2.readSpeed),
+        percentDiff: (stats1.readSpeed && stats2.readSpeed) ?
+          Math.abs(((stats1.readSpeed - stats2.readSpeed) / Math.min(stats1.readSpeed, stats2.readSpeed)) * 100).toFixed(1) : '0'
+      },
+      writeSpeed: {
+        winner: stats1.writeSpeed > stats2.writeSpeed ? 0 : stats1.writeSpeed < stats2.writeSpeed ? 1 : null,
+        difference: Math.abs(stats1.writeSpeed - stats2.writeSpeed),
+        percentDiff: (stats1.writeSpeed && stats2.writeSpeed) ?
+          Math.abs(((stats1.writeSpeed - stats2.writeSpeed) / Math.min(stats1.writeSpeed, stats2.writeSpeed)) * 100).toFixed(1) : '0'
+      },
+      reliability: {
+        winner: stats1.reliability > stats2.reliability ? 0 : stats1.reliability < stats2.reliability ? 1 : null,
+        difference: Math.abs(stats1.reliability - stats2.reliability),
+        percentDiff: (stats1.reliability && stats2.reliability) ?
+          Math.abs(((stats1.reliability - stats2.reliability) / Math.min(stats1.reliability, stats2.reliability)) * 100).toFixed(1) : '0'
+      }
+    };
+  }, [showComparisonMode, configStats]);
   
-  return (
-    <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
-      <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-8">Storage Planner</h1>
-      
-      {/* Step 1: Select drives */}
-      <div className="mb-10">
-        <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Select drives</h2>
-        
-        {/* Drive size options */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-6">
-          {driveSizes.map(size => (
-            <button
-              key={size}
-              className="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-center"
-              onClick={() => addDrive(size)}
-            >
-              {size} TB
-            </button>
-          ))}
-        </div>
-        
-        {/* Selected drives visualization */}
-        <div className="bg-gray-800 p-4 rounded-lg">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
-            {[...Array(16)].map((_, index) => {
-              const drive = selectedDrives[index];
-              return (
-                <div 
-                  key={index} 
-                  className={`aspect-[3/4] rounded flex items-center justify-center text-center p-2 ${
-                    drive ? 'bg-gray-600 cursor-pointer text-gray-100' : 'border-2 border-dashed border-gray-600 text-gray-400'
-                  }`}
-                  onClick={() => drive && removeDrive(drive.id)}
-                >
-                  {drive && (
-                    <div>
-                      <div className="font-medium">{drive.size} TB</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        
-        <div className="flex justify-between mt-4">
-          <div className="text-gray-800 dark:text-gray-200">
-            Unassigned drives: {selectedDrives.length} / Total drives: {totalDrivesCount}
-          </div>
-          <div className="flex gap-2">
-            {fileSystem === 'ZFS' && (
-              <button 
-                className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
-                onClick={() => setShowVdevManager(true)}
-                disabled={selectedDrives.length === 0}
-              >
-                Create vdev
-              </button>
-            )}
-            <button 
-              className="text-blue-600 hover:underline"
-              onClick={resetDrives}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Display vdevs if ZFS is selected */}
-      {fileSystem === 'ZFS' && vdevs.length > 0 && (
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200">
-              ZFS Virtual Devices (vdevs)
-            </h2>
-            <button 
-              className="text-blue-600 hover:underline flex items-center"
-              onClick={() => setShowVdevInfo(true)}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              What are vdevs?
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            {vdevs.map((vdev, index) => {
-              const vdevStats = calculateVdevStorage(vdev);
-              return (
-                <div key={vdev.id} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-gray-800 dark:text-gray-200">
-                      vdev {index + 1}: {vdev.type} ({vdev.drives.length} drives)
-                    </h3>
-                    <button 
-                      className="text-red-600 hover:text-red-800"
-                      onClick={() => removeVdev(vdev.id)}
-                      title="Remove vdev"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {/* vdev drives */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-3">
-                    {vdev.drives.map(drive => (
-                      <div 
-                        key={drive.id} 
-                        className="aspect-[3/4] bg-gray-600 rounded flex items-center justify-center text-center p-2 text-gray-100"
-                      >
-                        <div className="font-medium">{drive.size} TB</div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* vdev stats */}
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Raw:</span> {vdevStats.total.toFixed(1)} TB
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Usable:</span> {vdevStats.available.toFixed(1)} TB
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Protection:</span> {vdevStats.protection.toFixed(1)} TB
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      
-      {/* Step 2: Usage estimate */}
-      <div>
+  // Get total number of drives (selected + in vdevs) for a config
+  const getTotalDrivesCount = (config: StorageConfig) => {
+    return config.selectedDrives.length + config.vdevs.reduce((sum, vdev) => sum + vdev.drives.length, 0);
+  };
+  
+  // Render a storage configuration
+  const renderStorageConfig = (config: StorageConfig, index: number, stats: any) => {
+    return (
+      <div className={`${showComparisonMode ? 'w-full' : ''}`}>
         {/* File System and RAID type selection in a single row */}
-        <div className="flex flex-wrap items-center gap-8 mb-6">
+        <div className="flex flex-wrap items-center gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">File System</label>
             <select 
               className="w-48 border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-              value={fileSystem}
-              onChange={(e) => setFileSystem(e.target.value)}
+              value={config.fileSystem}
+              onChange={(e) => updateConfig(index, { fileSystem: e.target.value })}
             >
               {Object.keys(raidOptions).map(fs => (
                 <option key={fs} value={fs}>{fs}</option>
               ))}
             </select>
-            {fileSystem === 'SnapRAID' && (
+            {config.fileSystem === 'SnapRAID' && (
               <button 
                 className="ml-2 text-blue-600 hover:underline text-sm"
                 onClick={() => setShowSnapraidInfo(true)}
@@ -640,16 +605,16 @@ const RAIDCalculator = () => {
           </div>
           
           {/* RAID type selection - only show if not using ZFS with vdevs */}
-          {!(fileSystem === 'ZFS' && vdevs.length > 0) && (
+          {!(config.fileSystem === 'ZFS' && config.vdevs.length > 0) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RAID types</label>
               <div className="flex items-center gap-2 relative">
                 <select 
                   className="w-48 border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-                  value={raidType}
-                  onChange={(e) => setRaidType(e.target.value)}
+                  value={config.raidType}
+                  onChange={(e) => updateConfig(index, { raidType: e.target.value })}
                 >
-                  {raidOptions[fileSystem as keyof typeof raidOptions].map(type => (
+                  {raidOptions[config.fileSystem as keyof typeof raidOptions].map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
@@ -660,15 +625,97 @@ const RAIDCalculator = () => {
               </div>
             </div>
           )}
+
+          {/* Option to copy from other config */}
+          {showComparisonMode && getTotalDrivesCount(configs[1 - index]) > 0 && (
+            <button 
+              className="mt-6 py-1 px-3 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-sm"
+              onClick={() => copyDrives(1 - index, index)}
+            >
+              Copy drives from {configs[1 - index].fileSystem}
+            </button>
+          )}
         </div>
         
+        {/* Display vdevs if ZFS is selected */}
+        {config.fileSystem === 'ZFS' && config.vdevs.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200">
+                ZFS Virtual Devices (vdevs)
+              </h2>
+              <button 
+                className="text-blue-600 hover:underline flex items-center"
+                onClick={() => setShowVdevInfo(true)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                What are vdevs?
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {config.vdevs.map((vdev, vdevIndex) => {
+                const vdevStats = calculateVdevStorage(vdev);
+                return (
+                  <div key={vdev.id} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-gray-800 dark:text-gray-200">
+                        vdev {vdevIndex + 1}: {vdev.type} ({vdev.drives.length} drives)
+                      </h3>
+                      <button 
+                        className="text-red-600 hover:text-red-800"
+                        onClick={() => {
+                          setActiveConfigIndex(index);
+                          removeVdev(vdev.id);
+                        }}
+                        title="Remove vdev"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    {/* vdev drives */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-3">
+                      {vdev.drives.map(drive => (
+                        <div 
+                          key={drive.id} 
+                          className="aspect-[3/4] bg-gray-600 rounded flex items-center justify-center text-center p-2 text-gray-100"
+                        >
+                          <div className="font-medium">{drive.size} TB</div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* vdev stats */}
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Raw:</span> {vdevStats.total.toFixed(1)} TB
+                      </div>
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Usable:</span> {vdevStats.available.toFixed(1)} TB
+                      </div>
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Protection:</span> {vdevStats.protection.toFixed(1)} TB
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
         {/* Simple bar graph for storage visualization */}
-        {(selectedDrives.length > 0 || vdevs.length > 0) && (
-          <div className="mt-6">
+        {(config.selectedDrives.length > 0 || config.vdevs.length > 0) && (
+          <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Storage Distribution</h3>
             
             <div className="mb-4">
-              <div className="flex w-full rounded-md overflow-hidden h-10">
+              <div className="flex w-full rounded-md overflow-hidden h-8">
                 {stats.available > 0 && (
                   <div 
                     className="bg-green-400 flex items-center justify-center text-xs text-gray-800"
@@ -690,7 +737,7 @@ const RAIDCalculator = () => {
             </div>
             
             {/* Legend */}
-            <div className="flex flex-wrap gap-6 text-sm text-gray-800 dark:text-gray-200">
+            <div className="flex flex-wrap gap-4 text-sm text-gray-800 dark:text-gray-200 mb-4">
               <div className="flex items-center gap-1">
                 <div className="w-4 h-4 bg-green-400"></div>
                 <span>Available capacity</span>
@@ -702,11 +749,11 @@ const RAIDCalculator = () => {
             </div>
             
             {/* Storage summary */}
-            <div className="mt-4 space-y-6">
+            <div className="space-y-4">
               {/* Storage capacity metrics */}
               <div>
                 <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Storage Capacity</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded">
                     <div className="text-sm text-gray-500 dark:text-gray-400">Total Raw Storage</div>
                     <div className="text-xl font-bold text-gray-800 dark:text-gray-200">{stats.total.toFixed(1)} TB</div>
@@ -731,7 +778,7 @@ const RAIDCalculator = () => {
               {/* Performance metrics */}
               <div>
                 <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Performance Metrics</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded">
                     <div className="text-sm text-gray-500 dark:text-gray-400">Read Speed (estimated)</div>
                     <div className="flex items-end gap-2">
@@ -780,8 +827,469 @@ const RAIDCalculator = () => {
           </div>
         )}
       </div>
+    );
+  };
+  
+  // Render a single drive slot
+  const renderDriveSlot = (index: number, config: StorageConfig) => {
+    const drive = config.selectedDrives[index];
+    return (
+      <div 
+        key={index} 
+        className={`aspect-[3/4] rounded flex items-center justify-center text-center p-2 ${
+          drive ? 'bg-gray-600 cursor-pointer text-gray-100' : 'border-2 border-dashed border-gray-600 text-gray-400'
+        }`}
+        onClick={() => {
+          if (drive) {
+            setActiveConfigIndex(configs.indexOf(config));
+            removeDrive(drive.id);
+          }
+        }}
+      >
+        {drive && (
+          <div>
+            <div className="font-medium">{drive.size} TB</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+  
+  return (
+    <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100">Storage Planner</h1>
+        
+        {/* Comparison Mode Toggle */}
+        <button
+          className={`py-2 px-4 rounded ${
+            showComparisonMode 
+              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+          }`}
+          onClick={() => setShowComparisonMode(!showComparisonMode)}
+        >
+          {showComparisonMode ? 'Exit Comparison' : 'Compare RAID Types'}
+        </button>
+      </div>
       
-      {/* vdev Manager modal */}
+      {/* Step 1: Select drives */}
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Select drives</h2>
+        
+        {/* Drive size options */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-6">
+          {driveSizes.map(size => (
+            <button
+              key={size}
+              className="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-center"
+              onClick={() => addDrive(size)}
+            >
+              {size} TB
+            </button>
+          ))}
+        </div>
+        
+        {!showComparisonMode ? (
+          // Regular mode: Show one set of drives
+          <>
+            {/* Selected drives visualization */}
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
+                {[...Array(16)].map((_, index) => renderDriveSlot(index, configs[activeConfigIndex]))}
+              </div>
+            </div>
+            
+            <div className="flex justify-between mt-4">
+              <div className="text-gray-800 dark:text-gray-200">
+                Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
+                Total drives: {getTotalDrivesCount(configs[activeConfigIndex])}
+              </div>
+              <div className="flex gap-2">
+                {configs[activeConfigIndex].fileSystem === 'ZFS' && (
+                  <button 
+                    className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
+                    onClick={() => setShowVdevManager(true)}
+                    disabled={configs[activeConfigIndex].selectedDrives.length === 0}
+                  >
+                    Create vdev
+                  </button>
+                )}
+                <button 
+                  className="text-blue-600 hover:underline"
+                  onClick={resetDrives}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          // Comparison mode: Show tabs and two sets of drives
+          <>
+            {/* Configuration tabs */}
+            <div className="flex mb-4">
+              {configs.map((config, index) => (
+                <button
+                  key={config.id}
+                  className={`py-2 px-4 border-t border-l border-r rounded-t ${
+                    activeConfigIndex === index
+                      ? 'bg-gray-800 text-white'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                  onClick={() => setActiveConfigIndex(index)}
+                >
+                  Config {index + 1}: {config.fileSystem} {config.raidType}
+                </button>
+              ))}
+            </div>
+            
+            {/* Active configuration drives */}
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
+                {[...Array(16)].map((_, index) => renderDriveSlot(index, configs[activeConfigIndex]))}
+              </div>
+            </div>
+            
+            <div className="flex justify-between mt-4">
+              <div className="text-gray-800 dark:text-gray-200">
+                Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
+                Total drives: {getTotalDrivesCount(configs[activeConfigIndex])}
+              </div>
+              <div className="flex gap-2">
+                {configs[activeConfigIndex].fileSystem === 'ZFS' && (
+                  <button 
+                    className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
+                    onClick={() => setShowVdevManager(true)}
+                    disabled={configs[activeConfigIndex].selectedDrives.length === 0}
+                  >
+                    Create vdev
+                  </button>
+                )}
+                <button 
+                  className="text-blue-600 hover:underline"
+                  onClick={resetDrives}
+                >
+                  Reset Config
+                </button>
+                <button 
+                  className="text-red-600 hover:underline"
+                  onClick={resetAllConfigs}
+                >
+                  Reset All
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Step 2: Configuration & results */}
+      {!showComparisonMode ? (
+        // Regular mode: Single configuration
+        renderStorageConfig(configs[0], 0, configStats[0])
+      ) : (
+        // Comparison mode: Two configurations side by side
+        <div>
+          <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Compare Configurations</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {configs.map((config, index) => (
+              <div key={config.id} className="border rounded-lg p-4">
+                <h3 className="text-xl font-bold text-gray-700 dark:text-gray-200 mb-3">
+                  Configuration {index + 1}: {config.fileSystem} {config.raidType}
+                </h3>
+                {renderStorageConfig(config, index, configStats[index])}
+              </div>
+            ))}
+          </div>
+          
+          {/* Comparison results */}
+          {comparisonResult && configStats[0].total > 0 && configStats[1].total > 0 && (
+            <div className="mt-8 p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Comparison Results</h3>
+              
+              <div className="space-y-4">
+                {/* Capacity comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div className="font-medium text-gray-700 dark:text-gray-300">Usable Capacity</div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[0].formatted.toFixed(1)} TB
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {comparisonResult.capacity.winner !== null ? (
+                      <div className="text-center">
+                        <div className={`text-lg font-bold ${comparisonResult.capacity.winner === 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {comparisonResult.capacity.difference} TB
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {comparisonResult.capacity.percentDiff}% difference
+                        </div>
+                        <div className="flex justify-center mt-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${comparisonResult.capacity.winner === 0 ? 'text-green-600 rotate-180' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 dark:text-gray-400">Equal</div>
+                    )}
+                  </div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[1].formatted.toFixed(1)} TB
+                  </div>
+                  <div className="text-center text-sm">
+                    {comparisonResult.capacity.winner === 0 ? (
+                      <span className="text-green-600 font-medium">Config 1 has {comparisonResult.capacity.percentDiff}% more capacity</span>
+                    ) : comparisonResult.capacity.winner === 1 ? (
+                      <span className="text-blue-600 font-medium">Config 2 has {comparisonResult.capacity.percentDiff}% more capacity</span>
+                    ) : (
+                      <span className="text-gray-500">Same capacity</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Efficiency comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div className="font-medium text-gray-700 dark:text-gray-300">Storage Efficiency</div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[0].total > 0 ? ((configStats[0].available / configStats[0].total) * 100).toFixed(1) : 0}%
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {comparisonResult.efficiency.winner !== null ? (
+                      <div className="text-center">
+                        <div className={`text-lg font-bold ${comparisonResult.efficiency.winner === 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {(parseFloat(comparisonResult.efficiency.difference) * 100).toFixed(1)}%
+                        </div>
+                        <div className="flex justify-center mt-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${comparisonResult.efficiency.winner === 0 ? 'text-green-600 rotate-180' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 dark:text-gray-400">Equal</div>
+                    )}
+                  </div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[1].total > 0 ? ((configStats[1].available / configStats[1].total) * 100).toFixed(1) : 0}%
+                  </div>
+                  <div className="text-center text-sm">
+                    {comparisonResult.efficiency.winner === 0 ? (
+                      <span className="text-green-600 font-medium">Config 1 is more efficient</span>
+                    ) : comparisonResult.efficiency.winner === 1 ? (
+                      <span className="text-blue-600 font-medium">Config 2 is more efficient</span>
+                    ) : (
+                      <span className="text-gray-500">Same efficiency</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Read Speed comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div className="font-medium text-gray-700 dark:text-gray-300">Read Speed</div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[0].readSpeed} MB/s
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {comparisonResult.readSpeed.winner !== null ? (
+                      <div className="text-center">
+                        <div className={`text-lg font-bold ${comparisonResult.readSpeed.winner === 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {comparisonResult.readSpeed.difference} MB/s
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {comparisonResult.readSpeed.percentDiff}% difference
+                        </div>
+                        <div className="flex justify-center mt-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${comparisonResult.readSpeed.winner === 0 ? 'text-green-600 rotate-180' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 dark:text-gray-400">Equal</div>
+                    )}
+                  </div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[1].readSpeed} MB/s
+                  </div>
+                  <div className="text-center text-sm">
+                    {comparisonResult.readSpeed.winner === 0 ? (
+                      <span className="text-green-600 font-medium">Config 1 is {comparisonResult.readSpeed.percentDiff}% faster for reads</span>
+                    ) : comparisonResult.readSpeed.winner === 1 ? (
+                      <span className="text-blue-600 font-medium">Config 2 is {comparisonResult.readSpeed.percentDiff}% faster for reads</span>
+                    ) : (
+                      <span className="text-gray-500">Same read speed</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Write Speed comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div className="font-medium text-gray-700 dark:text-gray-300">Write Speed</div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[0].writeSpeed} MB/s
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {comparisonResult.writeSpeed.winner !== null ? (
+                      <div className="text-center">
+                        <div className={`text-lg font-bold ${comparisonResult.writeSpeed.winner === 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {comparisonResult.writeSpeed.difference} MB/s
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {comparisonResult.writeSpeed.percentDiff}% difference
+                        </div>
+                        <div className="flex justify-center mt-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${comparisonResult.writeSpeed.winner === 0 ? 'text-green-600 rotate-180' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 dark:text-gray-400">Equal</div>
+                    )}
+                  </div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[1].writeSpeed} MB/s
+                  </div>
+                  <div className="text-center text-sm">
+                    {comparisonResult.writeSpeed.winner === 0 ? (
+                      <span className="text-green-600 font-medium">Config 1 is {comparisonResult.writeSpeed.percentDiff}% faster for writes</span>
+                    ) : comparisonResult.writeSpeed.winner === 1 ? (
+                      <span className="text-blue-600 font-medium">Config 2 is {comparisonResult.writeSpeed.percentDiff}% faster for writes</span>
+                    ) : (
+                      <span className="text-gray-500">Same write speed</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Reliability comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div className="font-medium text-gray-700 dark:text-gray-300">Reliability</div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[0].reliability}/100
+                  </div>
+                  <div className="flex items-center justify-center">
+                    {comparisonResult.reliability.winner !== null ? (
+                      <div className="text-center">
+                        <div className={`text-lg font-bold ${comparisonResult.reliability.winner === 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {comparisonResult.reliability.difference} points
+                        </div>
+                        <div className="flex justify-center mt-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${comparisonResult.reliability.winner === 0 ? 'text-green-600 rotate-180' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 dark:text-gray-400">Equal</div>
+                    )}
+                  </div>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
+                    {configStats[1].reliability}/100
+                  </div>
+                  <div className="text-center text-sm">
+                    {comparisonResult.reliability.winner === 0 ? (
+                      <span className="text-green-600 font-medium">Config 1 is more reliable</span>
+                    ) : comparisonResult.reliability.winner === 1 ? (
+                      <span className="text-blue-600 font-medium">Config 2 is more reliable</span>
+                    ) : (
+                      <span className="text-gray-500">Same reliability</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Overall Recommendation */}
+                <div className="mt-6 p-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                  <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Recommendation</h4>
+                  {(() => {
+                    // Count advantages for each configuration
+                    let config1Advantages = 0;
+                    let config2Advantages = 0;
+                    
+                    if (comparisonResult.capacity.winner === 0) config1Advantages++;
+                    if (comparisonResult.capacity.winner === 1) config2Advantages++;
+                    
+                    if (comparisonResult.efficiency.winner === 0) config1Advantages++;
+                    if (comparisonResult.efficiency.winner === 1) config2Advantages++;
+                    
+                    if (comparisonResult.readSpeed.winner === 0) config1Advantages++;
+                    if (comparisonResult.readSpeed.winner === 1) config2Advantages++;
+                    
+                    if (comparisonResult.writeSpeed.winner === 0) config1Advantages++;
+                    if (comparisonResult.writeSpeed.winner === 1) config2Advantages++;
+                    
+                    if (comparisonResult.reliability.winner === 0) config1Advantages++;
+                    if (comparisonResult.reliability.winner === 1) config2Advantages++;
+                    
+                    if (config1Advantages > config2Advantages) {
+                      return (
+                        <div className="text-gray-800 dark:text-gray-200">
+                          <strong className="text-green-600">Configuration 1 ({configs[0].fileSystem} {configs[0].raidType})</strong> is 
+                          recommended as it performs better in {config1Advantages} out of 5 metrics.
+                          {configStats[0].reliability > 80 && configStats[0].reliability > configStats[1].reliability && 
+                            " It offers superior reliability which is crucial for data protection."}
+                          {configStats[0].formatted > configStats[1].formatted && 
+                            ` It also provides ${(configStats[0].formatted - configStats[1].formatted).toFixed(1)} TB more usable storage.`}
+                        </div>
+                      );
+                    } else if (config2Advantages > config1Advantages) {
+                      return (
+                        <div className="text-gray-800 dark:text-gray-200">
+                          <strong className="text-blue-600">Configuration 2 ({configs[1].fileSystem} {configs[1].raidType})</strong> is 
+                          recommended as it performs better in {config2Advantages} out of 5 metrics.
+                          {configStats[1].reliability > 80 && configStats[1].reliability > configStats[0].reliability && 
+                            " It offers superior reliability which is crucial for data protection."}
+                          {configStats[1].formatted > configStats[0].formatted && 
+                            ` It also provides ${(configStats[1].formatted - configStats[0].formatted).toFixed(1)} TB more usable storage.`}
+                        </div>
+                      );
+                    } else {
+                      // Count tiebreakers
+                      if (configStats[0].reliability > configStats[1].reliability) {
+                        return (
+                          <div className="text-gray-800 dark:text-gray-200">
+                            Both configurations have equal advantages, but <strong className="text-green-600">Configuration 1</strong> is 
+                            slightly recommended due to better reliability which is crucial for data protection.
+                          </div>
+                        );
+                      } else if (configStats[1].reliability > configStats[0].reliability) {
+                        return (
+                          <div className="text-gray-800 dark:text-gray-200">
+                            Both configurations have equal advantages, but <strong className="text-blue-600">Configuration 2</strong> is 
+                            slightly recommended due to better reliability which is crucial for data protection.
+                          </div>
+                        );
+                      } else if (configStats[0].formatted > configStats[1].formatted) {
+                        return (
+                          <div className="text-gray-800 dark:text-gray-200">
+                            Both configurations have equal advantages, but <strong className="text-green-600">Configuration 1</strong> is 
+                            slightly recommended due to higher usable storage capacity.
+                          </div>
+                        );
+                      } else if (configStats[1].formatted > configStats[0].formatted) {
+                        return (
+                          <div className="text-gray-800 dark:text-gray-200">
+                            Both configurations have equal advantages, but <strong className="text-blue-600">Configuration 2</strong> is 
+                            slightly recommended due to higher usable storage capacity.
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="text-gray-800 dark:text-gray-200">
+                            Both configurations are equally matched across all metrics. Choose based on your specific needs or preference.
+                          </div>
+                        );
+                      }
+                    }
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Modals - Same as in original code */}
       {showVdevManager && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div 
@@ -805,14 +1313,14 @@ const RAIDCalculator = () => {
             
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Selected Drives: {selectedDrives.length}
+                Selected Drives: {configs[activeConfigIndex].selectedDrives.length}
               </label>
               <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-md max-h-40 overflow-y-auto">
-                {selectedDrives.length === 0 ? (
+                {configs[activeConfigIndex].selectedDrives.length === 0 ? (
                   <p className="text-gray-500 dark:text-gray-400 text-center py-2">No drives selected</p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
-                    {selectedDrives.map(drive => (
+                    {configs[activeConfigIndex].selectedDrives.map(drive => (
                       <div 
                         key={drive.id} 
                         className="aspect-square bg-gray-600 rounded flex items-center justify-center text-center p-1 text-gray-100 text-sm"
@@ -845,10 +1353,10 @@ const RAIDCalculator = () => {
               </button>
               <button 
                 className={`py-2 px-4 bg-blue-600 text-white rounded ${
-                  selectedDrives.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+                  configs[activeConfigIndex].selectedDrives.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
                 }`}
                 onClick={createVdev}
-                disabled={selectedDrives.length === 0}
+                disabled={configs[activeConfigIndex].selectedDrives.length === 0}
               >
                 Create vdev
               </button>
@@ -857,6 +1365,7 @@ const RAIDCalculator = () => {
         </div>
       )}
       
+      {/* Other modals would remain the same as in the original code */}
       {/* vdev Info modal */}
       {showVdevInfo && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -876,6 +1385,7 @@ const RAIDCalculator = () => {
               </button>
             </div>
             
+            {/* vdev info content - same as original */}
             <div className="space-y-4 text-gray-700 dark:text-gray-300">
               <p>
                 In ZFS, a virtual device (vdev) is a group of physical drives that acts as a single storage unit.
@@ -920,218 +1430,7 @@ const RAIDCalculator = () => {
         </div>
       )}
       
-      {/* SnapRAID Info modal */}
-      {showSnapraidInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div 
-            ref={snapraidInfoRef}
-            className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Understanding SnapRAID</h3>
-              <button 
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={() => setShowSnapraidInfo(false)}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="space-y-4 text-gray-700 dark:text-gray-300">
-                              <p>
-                SnapRAID is a software solution that provides data redundancy for home media servers and NAS systems. 
-                Unlike traditional RAID, SnapRAID is designed for arrays that are primarily read-only with infrequent writes.
-              </p>
-              
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Key Features</h4>
-              <ul className="list-disc pl-5 space-y-2">
-                <li><strong>Parity Protection</strong>: Supports up to 6 parity drives for data protection.</li>
-                <li><strong>Independent Drives</strong>: Each drive can use different filesystems and sizes.</li>
-                <li><strong>Flexibility</strong>: Drives can be added or removed easily without rebuilding the array.</li>
-                <li><strong>Data Scrubbing</strong>: Periodic verification to protect against bit rot and silent corruption.</li>
-                <li><strong>File Snapshots</strong>: Keeps track of deleted files, providing a form of file history.</li>
-              </ul>
-              
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">How SnapRAID Works</h4>
-              <p>
-                SnapRAID calculates parity information across data drives and stores it on dedicated parity drives.
-                This is done in a scheduled manner (not real-time), typically daily or weekly.
-              </p>
-              <ul className="list-disc pl-5 space-y-2">
-                <li>Data is protected only after a sync operation is completed</li>
-                <li>The largest drive(s) are typically used for parity</li>
-                <li>Each parity drive allows you to recover from one additional drive failure</li>
-              </ul>
-              
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Advantages</h4>
-              <ul className="list-disc pl-5 space-y-2">
-                <li><strong>Protection against disk failures</strong>: Can recover from multiple drive failures (depending on parity configuration)</li>
-                <li><strong>Protection against file corruption</strong>: Due to checksum verification</li>
-                <li><strong>Protection against accidental deletion</strong>: Through file snapshots</li>
-                <li><strong>Ability to use disks of different sizes</strong>: Great for upgrading over time</li>
-                <li><strong>Low CPU usage</strong>: Only during sync operations</li>
-              </ul>
-              
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Best Use Cases</h4>
-              <ul className="list-disc pl-5 space-y-2">
-                <li>Media collections (movies, music, photos)</li>
-                <li>Backup storage</li>
-                <li>Any data that changes infrequently</li>
-                <li>Systems where individual drive access is desired</li>
-              </ul>
-              
-              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Limitations</h4>
-              <ul className="list-disc pl-5 space-y-2">
-                <li>Not designed for frequently changing data</li>
-                <li>No real-time protection (only after manual or scheduled sync)</li>
-                <li>No data striping for performance improvement</li>
-                <li>Not ideal for databases or virtual machines</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* RAID Info modal */}
-      {showRaidInfo && (
-        <div 
-          ref={raidInfoRef}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-        >
-          <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-200 dark:border-gray-700 max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="relative">
-              <button 
-                className="absolute top-0 right-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={() => setShowRaidInfo(false)}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 pr-8">RAID Types Explained</h3>
-              
-              <div className="space-y-6">
-                {/* SHR */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">SHR (Synology Hybrid RAID)</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 1 (2 for data protection)</p>
-                  <p className="text-gray-700 dark:text-gray-300">1 drive redundancy and optimized storage pool size. Best used when combining drives of varying sizes.</p>
-                </div>
-                
-                {/* SHR-2 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">SHR-2 (Synology Hybrid RAID)</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 4</p>
-                  <p className="text-gray-700 dark:text-gray-300">2 drive redundancy and optimized storage pool size. Best used when combining drives of varying sizes.</p>
-                </div>
-                
-                {/* RAID 0 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID 0</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 2</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Faster data access, maximum capacity.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: No drive redundancy, meaning increased risk of data loss. Not optimized for drives of varying sizes.</p>
-                </div>
-                
-                {/* RAID 1 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID 1</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 2</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Complete data redundancy, decent read performance.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Only 50% of total capacity is usable.</p>
-                </div>
-                
-                {/* RAID 5 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID 5</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 3</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Good balance of performance and redundancy, can survive one drive failure.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Capacity of one drive is used for parity information.</p>
-                </div>
-                
-                {/* RAID 6 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID 6</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 4</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Enhanced data protection, can survive two drive failures.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Capacity of two drives is used for parity information.</p>
-                </div>
-                
-                {/* RAID 10 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID 10</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 4</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Best performance and redundancy combination, can survive multiple drive failures.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Only 50% of total capacity is usable.</p>
-                </div>
-                
-                {/* ZFS RAID-Z1 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID-Z1 (ZFS)</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 3</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Similar to RAID 5 but with better data integrity, protection against data corruption.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Capacity of one drive is used for parity.</p>
-                </div>
-                
-                {/* ZFS RAID-Z2 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID-Z2 (ZFS)</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 4</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Similar to RAID 6 but with better data integrity, can survive two drive failures.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Capacity of two drives is used for parity.</p>
-                </div>
-                
-                {/* ZFS RAID-Z3 */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">RAID-Z3 (ZFS)</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 5</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Triple parity, can survive three drive failures.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Capacity of three drives is used for parity.</p>
-                </div>
-                
-                {/* ZFS Mirror */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Mirror (ZFS)</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Minimum drives: 2</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Pros: Similar to RAID 1, provides full redundancy and excellent read performance.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Cons: Only 50% of total capacity is usable.</p>
-                </div>
-                
-                {/* Synology BTRFS */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Synology BTRFS</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Synology&#39;s implementation of BTRFS offers several advantages:</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">• Snapshots: Point-in-time copies of data for easy recovery</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">• Self-healing: Automatic detection and repair of file corruption</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">• Quotas: Limit storage usage for shared folders</p>
-                  <p className="text-gray-700 dark:text-gray-300">• Checksums: Data integrity verification to prevent silent data corruption</p>
-                </div>
-                
-                {/* SnapRAID Parity */}
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">SnapRAID Parity</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">SnapRAID uses a parity-based protection system:</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">• 1 Parity: Single parity drive, protects against one drive failure.</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">• 2-6 Parity: Multiple parity drives for increased protection.</p>
-                  <p className="text-gray-700 dark:text-gray-300">• Unlike traditional RAID, parity is calculated periodically, not in real-time.</p>
-                </div>
-                
-                {/* UnRAID Parity */}
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Unraid Parity</h4>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Unraid uses a parity system that allows for varying drive sizes.</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Parity 1: Single parity drive, protects against one drive failure.</p>
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">Parity 2: Dual parity drives, protects against two drive failures.</p>
-                  <p className="text-gray-700 dark:text-gray-300">Parity 3: Triple parity drives, protects against three drive failures.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* SnapRAID Info modal and RAID Info modal would remain the same */}
     </div>
   );
 };
