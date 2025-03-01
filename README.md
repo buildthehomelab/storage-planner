@@ -2,14 +2,36 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/buildthehomelab/storage-planner/main/public/storage-planner-logo.png" alt="Storage Planner Logo" width="200">
   <br>
-  <h3>Interactive RAID and Storage Configuration Calculator</h3>
 </div>
 
 ## 📋 Overview
 
 Storage Planner is a modern, interactive web application that helps you plan and visualize your storage infrastructure. Whether you're building a home NAS, planning enterprise storage, or just exploring different RAID configurations, this tool helps you make informed decisions.
 
+<div align="center">
+  <img src="https://github.com/buildthehomelab/storage-planner/blob/main/public/storage-planner.gif"  width="400">
+</div>
 
+
+## 🏗️ Platform Support
+
+Storage Planner Docker images are built for multiple architectures:
+
+- `linux/amd64` - Standard x86_64 systems
+- `linux/arm64` - 64-bit ARM (ARMv8) systems like Raspberry Pi 4, AWS Graviton, and Apple Silicon
+- `linux/arm/v7` - 32-bit ARM systems like Raspberry Pi 3 and earlier
+
+This means you can run Storage Planner on various hardware without additional configuration. Docker will automatically pull the correct image for your architecture.
+
+## 🚀 Quick Start
+
+### Using Docker
+
+```bash
+docker pull ghcr.io/buildthehomelab/storage-planner:latest
+docker run -p 3000:3000 ghcr.io/buildthehomelab/storage-planner:latest
+```
+Visit `http://localhost:3000` in your browser.
 
 ## ✨ Features
 
@@ -22,7 +44,7 @@ Storage Planner is a modern, interactive web application that helps you plan and
 
 - **Interactive Drive Visualization**:
   - Drag-and-drop drive management
-  - Support for drives from 1TB to 20TB
+  - Support for drives from 1TB to 30TB
   - Create and manage ZFS vdevs visually
 
 - **Detailed Performance Metrics**:
@@ -35,36 +57,6 @@ Storage Planner is a modern, interactive web application that helps you plan and
   - Detailed explanations of RAID types
   - ZFS vdev configuration guides
   - SnapRAID functionality overview
-
-## 🚀 Quick Start
-
-### Using Docker
-
-```bash
-docker pull ghcr.io/buildthehomelab/storage-planner:latest
-docker run -p 3000:3000 ghcr.io/buildthehomelab/storage-planner:latest
-```
-
-### Manual Setup
-
-```bash
-git clone https://github.com/buildthehomelab/storage-planner.git
-cd storage-planner
-npm install
-npm run dev
-```
-
-Visit `http://localhost:3000` in your browser.
-
-## 🏗️ Platform Support
-
-Storage Planner Docker images are built for multiple architectures:
-
-- `linux/amd64` - Standard x86_64 systems
-- `linux/arm64` - 64-bit ARM (ARMv8) systems like Raspberry Pi 4, AWS Graviton, and Apple Silicon
-- `linux/arm/v7` - 32-bit ARM systems like Raspberry Pi 3 and earlier
-
-This means you can run Storage Planner on a wide variety of hardware without any additional configuration. Docker will automatically pull the correct image for your architecture.
 
 ## 🛠️ Technologies Used
 
