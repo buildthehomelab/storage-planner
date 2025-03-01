@@ -2,7 +2,6 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/buildthehomelab/storage-planner/main/public/storage-planner-logo.png" alt="Storage Planner Logo" width="200">
   <br>
-  <h3>Interactive RAID and Storage Configuration Calculator</h3>
 </div>
 
 ## 📋 Overview
