@@ -131,8 +131,8 @@ const ServerRack: React.FC<ServerRackProps> = ({
       
       {/* Server bottom with model info */}
       <div className="mt-4 flex justify-between items-center bg-gray-900 rounded-md p-2">
-        <div className="text-xs text-gray-500">SRV-R2401</div>
-        <div className="text-xs text-gray-500">Rack Mount 2U</div>
+        <div className="text-xs text-gray-500">SRV-R2502</div>
+        <div className="text-xs text-gray-500">4U Rack</div>
         <div className="flex space-x-2">
           <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
           <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
