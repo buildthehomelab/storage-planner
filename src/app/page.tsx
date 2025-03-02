@@ -874,16 +874,12 @@ Copy drives from {configs[1 - index].fileSystem}
 
 return (
   <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
-  <div className="flex justify-between items-center mb-8">
-  <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100">Storage Planner</h1>
-  
-        {/* Comparison Mode Toggle */}
-  
+  <div className="flex justify-between items-center mb-8">  
   </div>
   
-      {/* Step 1: Select drives */}
+  {/* Step 1: Select drives */}
   <div className="mb-10">
-  <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Select drives</h2>
+  <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Click on drives to get started</h2>
   
 {/* Drive size options */}
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-6">
