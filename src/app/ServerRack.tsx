@@ -58,7 +58,7 @@ const ServerRack: React.FC<ServerRackProps> = ({
         </div>
         
         {/* Server model/logo */}
-        <div className="text-gray-400 text-sm font-mono">Storage-Planner</div>
+        <div className="text-gray-400 text-sm font-mono">Storage Planner</div>
       </div>
       
       {/* Drive bay area */}
