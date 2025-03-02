@@ -857,7 +857,6 @@ const renderDriveSlot = (index: number, config: StorageConfig) => {
 
 return (
   <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
-  <div className="mb-8">
   <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100">Storage Planner</h1>
   </div>
   <div className="flex flex-wrap gap-2 mb-6">
@@ -871,9 +870,6 @@ return (
     {size} TB
     </button>
     ))}
-  </div>
-
-  {/* Moved Comparison Mode Toggle */}
   <button
   className={`py-2 px-4 rounded ${
     showComparisonMode 
@@ -882,7 +878,7 @@ return (
   }`}
   onClick={() => setShowComparisonMode(!showComparisonMode)}
   >
-  {showComparisonMode ? 'Exit Comparison' : 'Compare RAID Types'}
+  {showComparisonMode ? 'Exit Comparison' : 'Comparison'}
   </button>
   </div>
 
