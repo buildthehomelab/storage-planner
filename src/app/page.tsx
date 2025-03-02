@@ -87,7 +87,7 @@ const RAIDCalculator = () => {
     });
   };
 
-  // Update RAID type when file system changes for a config
+  // Update  when file system changes for a config
   useEffect(() => {
     configs.forEach((config, index) => {
       if (!raidOptions[config.fileSystem as keyof typeof raidOptions].includes(config.raidType)) {
@@ -861,23 +861,14 @@ return (
   <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100">Storage Planner</h1>
   
         {/* Comparison Mode Toggle */}
-  <button
-  className={`py-2 px-4 rounded ${
-    showComparisonMode 
-    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-  }`}
-  onClick={() => setShowComparisonMode(!showComparisonMode)}
-  >
-  {showComparisonMode ? 'Exit Comparison' : 'Compare RAID Types'}
-  </button>
+  
   </div>
   
       {/* Step 1: Select drives */}
   <div className="mb-10">
   <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Select drives</h2>
   
-        {/* Drive size options */}
+{/* Drive size options */}
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-6">
   {driveSizes.map(size => (
     <button
@@ -888,6 +879,16 @@ return (
     {size} TB
     </button>
     ))}
+  <button
+  className={`py-2 px-4 rounded ${
+    showComparisonMode 
+    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+  }`}
+  onClick={() => setShowComparisonMode(!showComparisonMode)}
+  >
+  {showComparisonMode ? 'Exit Comparison' : 'Compare'}
+  </button>
   </div>
   
   {!showComparisonMode ? (
