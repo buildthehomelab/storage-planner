@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ServerRack from './ServerRack';
+import VdevRack from './VdevRack';
 
 // Interface for drive objects
 interface Drive {
@@ -23,6 +25,49 @@ interface StorageConfig {
   selectedDrives: Drive[];
   vdevs: Vdev[];
 }
+
+// Component for the vdev manager
+const VdevManagerDriveGrid = ({ drives }: { drives: Drive[] }) => {
+  return (
+    <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md max-h-40 overflow-y-auto">
+      {drives.length === 0 ? (
+        <p className="text-gray-500 dark:text-gray-400 text-center py-2">No drives selected</p>
+      ) : (
+        <div className="space-y-2">
+          {Array.from({ length: Math.ceil(drives.length / 4) }).map((_, rowIndex) => (
+            <div key={rowIndex} className="grid grid-cols-4 gap-2">
+              {drives.slice(rowIndex * 4, (rowIndex + 1) * 4).map(drive => (
+                <div 
+                  key={drive.id} 
+                  className="relative aspect-[3/1] rounded-sm overflow-hidden border border-gray-600
+                            bg-gray-700 transition-all duration-300"
+                >
+                  {/* Honeycomb pattern */}
+                  <div className="absolute inset-0 opacity-30">
+                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                      <pattern id={`honeycomb-vdev-${drive.id}`} patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="scale(0.5)">
+                        <rect width="100%" height="100%" fill="none" />
+                        <path d="M0,5 L2.5,0 L7.5,0 L10,5 L7.5,10 L2.5,10 Z" fill="currentColor" />
+                      </pattern>
+                      <rect width="100%" height="100%" fill={`url(#honeycomb-vdev-${drive.id})`} />
+                    </svg>
+                  </div>
+                  
+                  {/* Drive label */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="font-medium text-gray-200 text-xs bg-gray-800 bg-opacity-70 px-2 py-0.5 rounded">
+                      {drive.size} TB
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RAIDCalculator = () => {
   const [driveSize, setDriveSize] = useState(20);
@@ -640,74 +685,71 @@ Copy drives from {configs[1 - index].fileSystem}
         {/* Display vdevs if ZFS is selected */}
 {config.fileSystem === 'ZFS' && config.vdevs.length > 0 && (
   <div className="mb-6">
-  <div className="flex items-center justify-between mb-4">
-  <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200">
-  ZFS Virtual Devices (vdevs)
-  </h2>
-  <button 
-  className="text-blue-600 hover:underline flex items-center"
-  onClick={() => setShowVdevInfo(true)}
->
-<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-</svg>
-What are vdevs?
-</button>
-</div>
-
-<div className="space-y-4">
-{config.vdevs.map((vdev, vdevIndex) => {
-  const vdevStats = calculateVdevStorage(vdev);
-  return (
-    <div key={vdev.id} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-    <div className="flex justify-between items-center mb-3">
-    <h3 className="font-bold text-gray-800 dark:text-gray-200">
-    vdev {vdevIndex + 1}: {vdev.type} ({vdev.drives.length} drives)
-    </h3>
-    <button 
-    className="text-red-600 hover:text-red-800"
-    onClick={() => {
-      setActiveConfigIndex(index);
-        removeVdev(vdev.id);
-      }}
-      title="Remove vdev"
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200">
+        ZFS Virtual Devices (vdevs)
+      </h2>
+      <button 
+        className="text-blue-600 hover:underline flex items-center"
+        onClick={() => setShowVdevInfo(true)}
       >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-      </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        What are vdevs?
       </button>
-      </div>
-      
-                    {/* vdev drives */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-3">
-      {vdev.drives.map(drive => (
-        <div 
-        key={drive.id} 
-        className="aspect-[3/4] bg-gray-600 rounded flex items-center justify-center text-center p-2 text-gray-100"
-        >
-        <div className="font-medium">{drive.size} TB</div>
-        </div>
-        ))}
-      </div>
-      
-                    {/* vdev stats */}
-      <div className="grid grid-cols-3 gap-3 text-sm">
-      <div>
-      <span className="text-gray-500 dark:text-gray-400">Raw:</span> {vdevStats.total.toFixed(1)} TB
-      </div>
-      <div>
-      <span className="text-gray-500 dark:text-gray-400">Usable:</span> {vdevStats.available.toFixed(1)} TB
-      </div>
-      <div>
-      <span className="text-gray-500 dark:text-gray-400">Protection:</span> {vdevStats.protection.toFixed(1)} TB
-      </div>
-      </div>
-      </div>
-      );
+    </div>
+
+    <div className="space-y-4">
+      {config.vdevs.map((vdev, vdevIndex) => {
+        const vdevStats = calculateVdevStorage(vdev);
+        return (
+          <div key={vdev.id} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-gray-800 dark:text-gray-200">
+                vdev {vdevIndex + 1}: {vdev.type} ({vdev.drives.length} drives)
+              </h3>
+              <button 
+                className="text-red-600 hover:text-red-800"
+                onClick={() => {
+                  setActiveConfigIndex(index);
+                  removeVdev(vdev.id);
+                }}
+                title="Remove vdev"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Replace the grid of drives with VdevRack */}
+            <div className="mb-3">
+              <VdevRack 
+                drives={vdev.drives}
+                type={vdev.type}
+                vdevIndex={vdevIndex}
+              />
+            </div>
+            
+            {/* vdev stats */}
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Raw:</span> {vdevStats.total.toFixed(1)} TB
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Usable:</span> {vdevStats.available.toFixed(1)} TB
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Protection:</span> {vdevStats.protection.toFixed(1)} TB
+              </div>
+            </div>
+          </div>
+        );
       })}
-      </div>
-      </div>
-    )}
+    </div>
+  </div>
+)}
   
         {/* Simple bar graph for storage visualization */}
   {(config.selectedDrives.length > 0 || config.vdevs.length > 0) && (
@@ -830,43 +872,14 @@ What are vdevs?
   );
 };
 
-  // Render a single drive slot
-const renderDriveSlot = (index: number, config: StorageConfig) => {
-  const drive = config.selectedDrives[index];
-  return (
-    <div 
-    key={index} 
-    className={`aspect-[3/4] rounded flex items-center justify-center text-center p-2 ${
-      drive ? 'bg-gray-600 cursor-pointer text-gray-100' : 'border-2 border-dashed border-gray-600 text-gray-400'
-    }`}
-    onClick={() => {
-      if (drive) {
-        setActiveConfigIndex(configs.indexOf(config));
-        removeDrive(drive.id);
-      }
-    }}
-    >
-    {drive && (
-      <div>
-      <div className="font-medium">{drive.size} TB</div>
-      </div>
-    )}
-    </div>
-    );
-};
-
 return (
   <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
-  <div className="flex justify-between items-center mb-8">
-  <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100">Storage Planner</h1>
-  
-        {/* Comparison Mode Toggle */}
-  
+  <div className="flex justify-between items-center mb-8">  
   </div>
   
-      {/* Step 1: Select drives */}
+  {/* Step 1: Select drives */}
   <div className="mb-10">
-  <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Select drives</h2>
+  <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Click on drives to get started</h2>
   
 {/* Drive size options */}
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-6">
@@ -892,97 +905,98 @@ return (
   </div>
   
   {!showComparisonMode ? (
-          // Regular mode: Show one set of drives
+    // Regular mode: Show one set of drives with ServerRack
     <>
-            {/* Selected drives visualization */}
-    <div className="bg-gray-800 p-4 rounded-lg">
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
-    {[...Array(16)].map((_, index) => renderDriveSlot(index, configs[activeConfigIndex]))}
-    </div>
-    </div>
-    
-    <div className="flex justify-between mt-4">
-    <div className="text-gray-800 dark:text-gray-200">
-    Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
-    Total drives: {getTotalDrivesCount(configs[activeConfigIndex])}
-    </div>
-    <div className="flex gap-2">
-    {configs[activeConfigIndex].fileSystem === 'ZFS' && (
-      <button 
-      className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
-      onClick={() => setShowVdevManager(true)}
-      disabled={configs[activeConfigIndex].selectedDrives.length === 0}
-      >
-      Create vdev
-      </button>
-      )}
-    <button 
-    className="text-blue-600 hover:underline"
-    onClick={resetDrives}
-    >
-    Reset
-    </button>
-    </div>
-    </div>
+      <ServerRack 
+        drives={configs[activeConfigIndex].selectedDrives}
+        onDriveClick={(id) => {
+          if (id) removeDrive(id);
+        }}
+      />
+      
+      <div className="flex justify-between mt-4">
+        <div className="text-gray-800 dark:text-gray-200">
+          Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
+          Total drives: {getTotalDrivesCount(configs[activeConfigIndex])}
+        </div>
+        <div className="flex gap-2">
+          {configs[activeConfigIndex].fileSystem === 'ZFS' && (
+            <button 
+              className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
+              onClick={() => setShowVdevManager(true)}
+              disabled={configs[activeConfigIndex].selectedDrives.length === 0}
+            >
+              Create vdev
+            </button>
+          )}
+          <button 
+            className="text-blue-600 hover:underline"
+            onClick={resetDrives}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
     </>
-    ) : (
-          // Comparison mode: Show tabs and two sets of drives
+  ) : (
+    // Comparison mode: Show tabs and ServerRack
     <>
-            {/* Configuration tabs */}
-    <div className="flex mb-4">
-    {configs.map((config, index) => (
-      <button
-      key={config.id}
-      className={`py-2 px-4 border-t border-l border-r rounded-t ${
-        activeConfigIndex === index
-        ? 'bg-gray-800 text-white'
-        : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-      }`}
-      onClick={() => setActiveConfigIndex(index)}
-      >
-      Config {index + 1}: {config.fileSystem} {config.raidType}
-      </button>
-      ))}
-    </div>
-    
-            {/* Active configuration drives */}
-    <div className="bg-gray-800 p-4 rounded-lg">
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
-    {[...Array(16)].map((_, index) => renderDriveSlot(index, configs[activeConfigIndex]))}
-    </div>
-    </div>
-    
-    <div className="flex justify-between mt-4">
-    <div className="text-gray-800 dark:text-gray-200">
-    Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
-    Total drives: {getTotalDrivesCount(configs[activeConfigIndex])}
-    </div>
-    <div className="flex gap-2">
-    {configs[activeConfigIndex].fileSystem === 'ZFS' && (
-      <button 
-      className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
-      onClick={() => setShowVdevManager(true)}
-      disabled={configs[activeConfigIndex].selectedDrives.length === 0}
-      >
-      Create vdev
-      </button>
-      )}
-    <button 
-    className="text-blue-600 hover:underline"
-    onClick={resetDrives}
-    >
-    Reset Config
-    </button>
-    <button 
-    className="text-red-600 hover:underline"
-    onClick={resetAllConfigs}
-    >
-    Reset All
-    </button>
-    </div>
-    </div>
+      {/* Configuration tabs */}
+      <div className="flex mb-4">
+        {configs.map((config, index) => (
+          <button
+            key={config.id}
+            className={`py-2 px-4 border-t border-l border-r rounded-t ${
+              activeConfigIndex === index
+                ? 'bg-gray-800 text-white'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+            onClick={() => setActiveConfigIndex(index)}
+          >
+            Config {index + 1}: {config.fileSystem} {config.raidType}
+          </button>
+        ))}
+      </div>
+      
+      {/* Active configuration drives */}
+      <ServerRack 
+        drives={configs[activeConfigIndex].selectedDrives}
+        onDriveClick={(id) => {
+          if (id) removeDrive(id);
+        }}
+      />
+      
+      <div className="flex justify-between mt-4">
+        <div className="text-gray-800 dark:text-gray-200">
+          Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
+          Total drives: {getTotalDrivesCount(configs[activeConfigIndex])}
+        </div>
+        <div className="flex gap-2">
+          {configs[activeConfigIndex].fileSystem === 'ZFS' && (
+            <button 
+              className="py-1 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
+              onClick={() => setShowVdevManager(true)}
+              disabled={configs[activeConfigIndex].selectedDrives.length === 0}
+            >
+              Create vdev
+            </button>
+          )}
+          <button 
+            className="text-blue-600 hover:underline"
+            onClick={resetDrives}
+          >
+            Reset Config
+          </button>
+          <button 
+            className="text-red-600 hover:underline"
+            onClick={resetAllConfigs}
+          >
+            Reset All
+          </button>
+        </div>
+      </div>
     </>
-    )}
+  )}
     </div>
     
       {/* Step 2: Configuration & results */}
@@ -1290,81 +1304,69 @@ return (
 </div>
 )}
 
-      {/* Modals - Same as in original code */}
-{showVdevManager && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-  <div 
-  ref={vdevManagerRef}
-  className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full"
-  >
-  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Create vdev</h3>
-  
-  <div className="mb-4">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">vdev Type</label>
-  <select 
-  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-  value={currentVdevType}
-  onChange={(e) => setCurrentVdevType(e.target.value)}
-  >
-  {vdevTypes.map(type => (
-    <option key={type} value={type}>{type}</option>
-    ))}
-  </select>
-  </div>
-  
-  <div className="mb-4">
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-  Selected Drives: {configs[activeConfigIndex].selectedDrives.length}
-  </label>
-  <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-md max-h-40 overflow-y-auto">
-  {configs[activeConfigIndex].selectedDrives.length === 0 ? (
-    <p className="text-gray-500 dark:text-gray-400 text-center py-2">No drives selected</p>
-    ) : (
-    <div className="grid grid-cols-4 gap-2">
-    {configs[activeConfigIndex].selectedDrives.map(drive => (
-      <div 
-      key={drive.id} 
-      className="aspect-square bg-gray-600 rounded flex items-center justify-center text-center p-1 text-gray-100 text-sm"
-      >
-      {drive.size} TB
-      </div>
-      ))}
-    </div>
-    )}
-    </div>
-    </div>
-    
-    <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-    <p>Minimum drives needed:</p>
-    <ul className="list-disc pl-5 mt-1">
-    <li>RAID-Z1: 3 drives (1 drive redundancy)</li>
-    <li>RAID-Z2: 4 drives (2 drive redundancy)</li>
-    <li>RAID-Z3: 5 drives (3 drive redundancy)</li>
-    <li>Mirror: 2 drives (1:1 mirroring)</li>
-    <li>Striped: 2 drives (no redundancy)</li>
-    </ul>
-    </div>
-    
-    <div className="flex justify-end gap-2">
-    <button 
-    className="py-2 px-4 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
-    onClick={() => setShowVdevManager(false)}
-    >
-    Cancel
-    </button>
-    <button 
-    className={`py-2 px-4 bg-blue-600 text-white rounded ${
-      configs[activeConfigIndex].selectedDrives.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
-    }`}
-    onClick={createVdev}
-    disabled={configs[activeConfigIndex].selectedDrives.length === 0}
-    >
-    Create vdev
-    </button>
-    </div>
-    </div>
-    </div>
-    )}
+      {/* Modals */}
+      {/* VDev Manager with updated drive grid */}
+      {showVdevManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div 
+            ref={vdevManagerRef}
+            className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full"
+          >
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Create vdev</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">vdev Type</label>
+              <select 
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+                value={currentVdevType}
+                onChange={(e) => setCurrentVdevType(e.target.value)}
+              >
+                {vdevTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Selected Drives: {configs[activeConfigIndex].selectedDrives.length}
+              </label>
+              
+              {/* Replace the grid with our new VdevManagerDriveGrid component */}
+              <VdevManagerDriveGrid drives={configs[activeConfigIndex].selectedDrives} />
+            </div>
+            
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p>Minimum drives needed:</p>
+              <ul className="list-disc pl-5 mt-1">
+                <li>RAID-Z1: 3 drives (1 drive redundancy)</li>
+                <li>RAID-Z2: 4 drives (2 drive redundancy)</li>
+                <li>RAID-Z3: 5 drives (3 drive redundancy)</li>
+                <li>Mirror: 2 drives (1:1 mirroring)</li>
+                <li>Striped: 2 drives (no redundancy)</li>
+              </ul>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <button 
+                className="py-2 px-4 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
+                onClick={() => setShowVdevManager(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`py-2 px-4 bg-blue-600 text-white rounded ${
+                  configs[activeConfigIndex].selectedDrives.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+                }`}
+                onClick={createVdev}
+                disabled={configs[activeConfigIndex].selectedDrives.length === 0}
+              >
+                Create vdev
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Other modals would remain the same as in the original code */}
       {/* vdev Info modal */}
