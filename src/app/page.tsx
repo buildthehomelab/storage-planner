@@ -28,8 +28,8 @@ const RAIDCalculator = () => {
   const [driveSize, setDriveSize] = useState(20);
   const [showComparisonMode, setShowComparisonMode] = useState(false);
   const [activeConfigIndex, setActiveConfigIndex] = useState(0);
-
-// Initialize with two configurations
+  
+  // Initialize with two configurations
   const [configs, setConfigs] = useState<StorageConfig[]>([
     {
       id: 1,
@@ -47,23 +47,23 @@ const RAIDCalculator = () => {
     }
   ]);
 
-// Existing modal states
+  // Existing modal states
   const [showRaidInfo, setShowRaidInfo] = useState(false);
   const [showVdevManager, setShowVdevManager] = useState(false);
   const [showVdevInfo, setShowVdevInfo] = useState(false);
   const [showSnapraidInfo, setShowSnapraidInfo] = useState(false);
   const [currentVdevType, setCurrentVdevType] = useState('RAID-Z2');
-
-// Refs for modals
+  
+  // Refs for modals
   const raidInfoRef = useRef<HTMLDivElement>(null);
   const vdevManagerRef = useRef<HTMLDivElement>(null);
   const vdevInfoRef = useRef<HTMLDivElement>(null);
   const snapraidInfoRef = useRef<HTMLDivElement>(null);
 
-// Available drive sizes in TB
+  // Available drive sizes in TB
   const driveSizes = [30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1];
 
-// Raid type options based on file system
+  // Raid type options based on file system
   const raidOptions = useMemo(() => ({
     'ZFS': ['RAID-Z1', 'RAID-Z2', 'RAID-Z3', 'Mirror', 'Striped'],
     'Unraid': ['Parity 1', 'Parity 2', 'Parity 3'],
@@ -72,13 +72,13 @@ const RAIDCalculator = () => {
     'SnapRAID': ['1 Parity', '2 Parity', '3 Parity', '4 Parity', '5 Parity', '6 Parity'],
     'Standard': ['RAID 0', 'RAID 1', 'RAID 5', 'RAID 6', 'RAID 10']
   }), []);
-
-// vdev type options for ZFS
+  
+  // vdev type options for ZFS
   const vdevTypes = useMemo(() => [
     'RAID-Z1', 'RAID-Z2', 'RAID-Z3', 'Mirror', 'Striped'
   ], []);
 
-// Helper function to update a specific config
+  // Helper function to update a specific config
   const updateConfig = (configIndex: number, updates: Partial<StorageConfig>) => {
     setConfigs(prevConfigs => {
       const newConfigs = [...prevConfigs];
@@ -87,23 +87,23 @@ const RAIDCalculator = () => {
     });
   };
 
-// Update RAID type when file system changes for a config
+  // Update  when file system changes for a config
   useEffect(() => {
     configs.forEach((config, index) => {
       if (!raidOptions[config.fileSystem as keyof typeof raidOptions].includes(config.raidType)) {
         updateConfig(index, { 
           raidType: raidOptions[config.fileSystem as keyof typeof raidOptions][0] 
         });
-
-// Reset vdevs when changing away from ZFS
+        
+        // Reset vdevs when changing away from ZFS
         if (config.fileSystem !== 'ZFS') {
           updateConfig(index, { vdevs: [] });
         }
       }
     });
   }, [configs, raidOptions]);
-
-// Close popup windows when clicking outside
+  
+  // Close popup windows when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (raidInfoRef.current && !raidInfoRef.current.contains(event.target as Node)) {
@@ -119,14 +119,14 @@ const RAIDCalculator = () => {
         setShowSnapraidInfo(false);
       }
     }
-
+    
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [raidInfoRef, vdevManagerRef, vdevInfoRef, snapraidInfoRef]);
-
-// Add a drive to the active configuration
+  
+  // Add a drive to the active configuration
   const addDrive = (size: number) => {
     const activeConfig = configs[activeConfigIndex];
     if (activeConfig.selectedDrives.length < 16) {
@@ -134,23 +134,23 @@ const RAIDCalculator = () => {
       updateConfig(activeConfigIndex, { selectedDrives: updatedDrives });
     }
   };
-
-// Remove a drive from the active configuration
+  
+  // Remove a drive from the active configuration
   const removeDrive = (id: number) => {
     const activeConfig = configs[activeConfigIndex];
     const updatedDrives = activeConfig.selectedDrives.filter(drive => drive.id !== id);
     updateConfig(activeConfigIndex, { selectedDrives: updatedDrives });
   };
-
-// Reset drives for the active configuration
+  
+  // Reset drives for the active configuration
   const resetDrives = () => {
     updateConfig(activeConfigIndex, { 
       selectedDrives: [],
       vdevs: []
     });
   };
-
-// Reset all configurations
+  
+  // Reset all configurations
   const resetAllConfigs = () => {
     setConfigs(prevConfigs => prevConfigs.map(config => ({
       ...config,
@@ -158,18 +158,18 @@ const RAIDCalculator = () => {
       vdevs: []
     })));
   };
-
-// Create a new vdev with selected drives for the active configuration
+  
+  // Create a new vdev with selected drives for the active configuration
   const createVdev = () => {
     const activeConfig = configs[activeConfigIndex];
     if (activeConfig.selectedDrives.length === 0) return;
-
+    
     const newVdev: Vdev = {
       id: Date.now(),
       type: currentVdevType,
       drives: [...activeConfig.selectedDrives]
     };
-
+    
     const updatedVdevs = [...activeConfig.vdevs, newVdev];
     updateConfig(activeConfigIndex, { 
       vdevs: updatedVdevs,
@@ -177,11 +177,11 @@ const RAIDCalculator = () => {
     });
     setShowVdevManager(false);
   };
-
-// Remove a vdev from the active configuration
+  
+  // Remove a vdev from the active configuration
   const removeVdev = (id: number) => {
     const activeConfig = configs[activeConfigIndex];
-// Return the drives back to the pool
+    // Return the drives back to the pool
     const vdevToRemove = activeConfig.vdevs.find(vdev => vdev.id === id);
     if (vdevToRemove) {
       const updatedDrives = [...activeConfig.selectedDrives, ...vdevToRemove.drives];
@@ -192,24 +192,24 @@ const RAIDCalculator = () => {
       });
     }
   };
-
-// Copy drives from one configuration to another
+  
+  // Copy drives from one configuration to another
   const copyDrives = (fromIndex: number, toIndex: number) => {
     const sourceDrives = [...configs[fromIndex].selectedDrives];
     if (sourceDrives.length === 0) return;
-
-// Create new drive objects with new IDs to avoid conflicts
+    
+    // Create new drive objects with new IDs to avoid conflicts
     const newDrives = sourceDrives.map(drive => ({
       id: Date.now() + Math.random(),
       size: drive.size
     }));
-
+    
     updateConfig(toIndex, { 
       selectedDrives: [...configs[toIndex].selectedDrives, ...newDrives]
     });
   };
-
-// Calculate storage stats for a single vdev
+  
+  // Calculate storage stats for a single vdev
   const calculateVdevStorage = (vdev: Vdev) => {
     if (vdev.drives.length === 0) return { 
       total: 0, 
@@ -220,413 +220,413 @@ const RAIDCalculator = () => {
       writeSpeed: 0,
       reliability: 0
     };
-
+    
     const totalRawStorage = vdev.drives.reduce((sum, drive) => sum + drive.size, 0);
     let available = 0;
     let protection = 0;
     let readSpeed = 0;
     let writeSpeed = 0;
     let reliability = 0;
-
-// Base single drive performance values (relative units)
-const baseDriveReadSpeed = 150; // MB/s
-const baseDriveWriteSpeed = 140; // MB/s
-
-switch(vdev.type) {
-  case 'RAID 0':
-  case 'Striped':
-  available = totalRawStorage;
-  protection = 0;
-// Read/write scales with number of drives in RAID 0
-readSpeed = baseDriveReadSpeed * vdev.drives.length * 0.9; // 90% efficiency
-writeSpeed = baseDriveWriteSpeed * vdev.drives.length * 0.9; // 90% efficiency
-reliability = 0; // No redundancy
-break;
-case 'RAID 1':
-case 'Mirror':
-// For mirrored configurations, available space is equal to the smallest drive's capacity
-available = vdev.drives.length > 0 ? Math.min(...vdev.drives.map(d => d.size)) : 0;
-protection = totalRawStorage - available;
-// Read can benefit from multiple drives, write is limited to single drive
-readSpeed = baseDriveReadSpeed * Math.min(vdev.drives.length, 2) * 0.9; // Read from multiple drives
-writeSpeed = baseDriveWriteSpeed * 0.95; // Slightly slower than single drive
-reliability = 90; // High reliability with full mirroring
-break;
-case 'RAID 5':
-case 'RAID-Z1':
-case 'Parity 1':
-case 'SHR':
-available = vdev.drives.length > 1 ? totalRawStorage - Math.max(...vdev.drives.map(d => d.size)) : 0;
-protection = totalRawStorage - available;
-// RAID 5 read is good, write has parity overhead
-readSpeed = baseDriveReadSpeed * (vdev.drives.length - 1) * 0.8;
-writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 1) * 0.7; // Parity calculation slows writes
-reliability = 70; // Can survive one drive failure
-break;
-case 'RAID 6':
-case 'RAID-Z2':
-case 'Parity 2':
-case 'SHR-2':
-available = vdev.drives.length > 2 ? totalRawStorage - (2 * Math.max(...vdev.drives.map(d => d.size))) : 0;
-protection = totalRawStorage - available;
-// RAID 6 read is good, write has double parity overhead
-readSpeed = baseDriveReadSpeed * (vdev.drives.length - 2) * 0.8;
-writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 2) * 0.6; // Double parity calculation slows writes
-reliability = 85; // Can survive two drive failures
-break;
-case 'RAID-Z3':
-case 'Parity 3':
-available = vdev.drives.length > 3 ? totalRawStorage - (3 * Math.max(...vdev.drives.map(d => d.size))) : 0;
-protection = totalRawStorage - available;
-// RAID Z3 read is good, write has triple parity overhead
-readSpeed = baseDriveReadSpeed * (vdev.drives.length - 3) * 0.8;
-writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 3) * 0.5; // Triple parity calculation slows writes
-reliability = 95; // Can survive three drive failures
-break;
-case 'RAID 10':
-available = totalRawStorage / 2;
-protection = totalRawStorage - available;
-// RAID 10 has excellent read/write performance
-readSpeed = baseDriveReadSpeed * (vdev.drives.length / 2) * 0.95;
-writeSpeed = baseDriveWriteSpeed * (vdev.drives.length / 2) * 0.9;
-reliability = 80; // Good reliability with mirroring
-break;
-default:
-available = totalRawStorage / 2;
-protection = totalRawStorage - available;
-readSpeed = baseDriveReadSpeed;
-writeSpeed = baseDriveWriteSpeed;
-reliability = 50;
-}
-
-return { 
-  total: totalRawStorage, 
-  available: Math.max(0, available), 
-  protection: Math.max(0, protection),
-formatted: 0, // This will be calculated later
-readSpeed: Math.max(0, Math.round(readSpeed)),
-writeSpeed: Math.max(0, Math.round(writeSpeed)),
-reliability: Math.max(0, Math.min(100, reliability))
-};
-};
-
-// Calculate storage stats for a configuration
-const calculateStorage = (config: StorageConfig) => {
-// If ZFS with vdevs, use vdev calculation
-  if (config.fileSystem === 'ZFS' && config.vdevs.length > 0) {
-// Calculate stats for each vdev
-    const vdevStats = config.vdevs.map(calculateVdevStorage);
-
-// In a ZFS pool with multiple vdevs, total available space is the sum
-    const totalRawStorage = vdevStats.reduce((sum, stat) => sum + stat.total, 0);
-    const available = vdevStats.reduce((sum, stat) => sum + stat.available, 0);
-    const protection = vdevStats.reduce((sum, stat) => sum + stat.protection, 0);
-
-// Calculate read speed with diminishing returns
-    let readSpeed = 0;
-    if (vdevStats.length > 0) {
-      const baseReadSpeed = vdevStats.reduce((sum, stat) => sum + stat.readSpeed, 0);
-      const diminishingFactor = Math.max(0.7, 0.95 - (vdevStats.length * 0.03));
-      readSpeed = baseReadSpeed * diminishingFactor;
-    }
-
-// Calculate write speed with parallelism boost
-    let writeSpeed = 0;
-    if (vdevStats.length > 0) {
-      const avgWriteSpeed = vdevStats.reduce((sum, stat) => sum + stat.writeSpeed, 0) / vdevStats.length;
-      const parallelismBoost = Math.min(1.8, 0.9 + (vdevStats.length * 0.15));
-      writeSpeed = avgWriteSpeed * parallelismBoost;
-    }
-
-// Overall reliability is limited by the least reliable vdev
-    const reliability = vdevStats.length > 0 ? 
-    Math.min(...vdevStats.map(stat => stat.reliability)) : 0;
-
-// Calculate formatted capacity based on file system overhead
-const overheadPercentage = 0.08; // ZFS typically has 5-10% overhead
-const formatted = Math.max(0, available) * (1 - overheadPercentage);
-
-return { 
-  total: totalRawStorage, 
-  available, 
-  protection,
-  formatted,
-  readSpeed: Math.max(0, Math.round(readSpeed)),
-  writeSpeed: Math.max(0, Math.round(writeSpeed)),
-  reliability
-};
-} else {
-// Standard calculation for non-ZFS or ZFS without vdevs
-  if (config.selectedDrives.length === 0) return { 
-    total: 0, 
-    available: 0, 
-    protection: 0, 
-    formatted: 0,
-    readSpeed: 0,
-    writeSpeed: 0,
-    reliability: 0
+    
+    // Base single drive performance values (relative units)
+    const baseDriveReadSpeed = 150; // MB/s
+    const baseDriveWriteSpeed = 140; // MB/s
+    
+    switch(vdev.type) {
+      case 'RAID 0':
+      case 'Striped':
+      available = totalRawStorage;
+      protection = 0;
+        // Read/write scales with number of drives in RAID 0
+        readSpeed = baseDriveReadSpeed * vdev.drives.length * 0.9; // 90% efficiency
+        writeSpeed = baseDriveWriteSpeed * vdev.drives.length * 0.9; // 90% efficiency
+        reliability = 0; // No redundancy
+        break;
+        case 'RAID 1':
+        case 'Mirror':
+        // For mirrored configurations, available space is equal to the smallest drive's capacity
+        available = vdev.drives.length > 0 ? Math.min(...vdev.drives.map(d => d.size)) : 0;
+        protection = totalRawStorage - available;
+        // Read can benefit from multiple drives, write is limited to single drive
+        readSpeed = baseDriveReadSpeed * Math.min(vdev.drives.length, 2) * 0.9; // Read from multiple drives
+        writeSpeed = baseDriveWriteSpeed * 0.95; // Slightly slower than single drive
+        reliability = 90; // High reliability with full mirroring
+        break;
+        case 'RAID 5':
+        case 'RAID-Z1':
+        case 'Parity 1':
+        case 'SHR':
+        available = vdev.drives.length > 1 ? totalRawStorage - Math.max(...vdev.drives.map(d => d.size)) : 0;
+        protection = totalRawStorage - available;
+        // RAID 5 read is good, write has parity overhead
+        readSpeed = baseDriveReadSpeed * (vdev.drives.length - 1) * 0.8;
+        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 1) * 0.7; // Parity calculation slows writes
+        reliability = 70; // Can survive one drive failure
+        break;
+        case 'RAID 6':
+        case 'RAID-Z2':
+        case 'Parity 2':
+        case 'SHR-2':
+        available = vdev.drives.length > 2 ? totalRawStorage - (2 * Math.max(...vdev.drives.map(d => d.size))) : 0;
+        protection = totalRawStorage - available;
+        // RAID 6 read is good, write has double parity overhead
+        readSpeed = baseDriveReadSpeed * (vdev.drives.length - 2) * 0.8;
+        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 2) * 0.6; // Double parity calculation slows writes
+        reliability = 85; // Can survive two drive failures
+        break;
+        case 'RAID-Z3':
+        case 'Parity 3':
+        available = vdev.drives.length > 3 ? totalRawStorage - (3 * Math.max(...vdev.drives.map(d => d.size))) : 0;
+        protection = totalRawStorage - available;
+        // RAID Z3 read is good, write has triple parity overhead
+        readSpeed = baseDriveReadSpeed * (vdev.drives.length - 3) * 0.8;
+        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 3) * 0.5; // Triple parity calculation slows writes
+        reliability = 95; // Can survive three drive failures
+        break;
+        case 'RAID 10':
+        available = totalRawStorage / 2;
+        protection = totalRawStorage - available;
+        // RAID 10 has excellent read/write performance
+        readSpeed = baseDriveReadSpeed * (vdev.drives.length / 2) * 0.95;
+        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length / 2) * 0.9;
+        reliability = 80; // Good reliability with mirroring
+        break;
+        default:
+        available = totalRawStorage / 2;
+        protection = totalRawStorage - available;
+        readSpeed = baseDriveReadSpeed;
+        writeSpeed = baseDriveWriteSpeed;
+        reliability = 50;
+      }
+      
+      return { 
+        total: totalRawStorage, 
+        available: Math.max(0, available), 
+        protection: Math.max(0, protection),
+      formatted: 0, // This will be calculated later
+      readSpeed: Math.max(0, Math.round(readSpeed)),
+      writeSpeed: Math.max(0, Math.round(writeSpeed)),
+      reliability: Math.max(0, Math.min(100, reliability))
+    };
   };
+  
+  // Calculate storage stats for a configuration
+  const calculateStorage = (config: StorageConfig) => {
+    // If ZFS with vdevs, use vdev calculation
+    if (config.fileSystem === 'ZFS' && config.vdevs.length > 0) {
+      // Calculate stats for each vdev
+      const vdevStats = config.vdevs.map(calculateVdevStorage);
+      
+      // In a ZFS pool with multiple vdevs, total available space is the sum
+      const totalRawStorage = vdevStats.reduce((sum, stat) => sum + stat.total, 0);
+      const available = vdevStats.reduce((sum, stat) => sum + stat.available, 0);
+      const protection = vdevStats.reduce((sum, stat) => sum + stat.protection, 0);
+      
+      // Calculate read speed with diminishing returns
+      let readSpeed = 0;
+      if (vdevStats.length > 0) {
+        const baseReadSpeed = vdevStats.reduce((sum, stat) => sum + stat.readSpeed, 0);
+        const diminishingFactor = Math.max(0.7, 0.95 - (vdevStats.length * 0.03));
+        readSpeed = baseReadSpeed * diminishingFactor;
+      }
 
-  const totalRawStorage = config.selectedDrives.reduce((sum, drive) => sum + drive.size, 0);
-  let available = 0;
-  let protection = 0;
-  let readSpeed = 0;
-  let writeSpeed = 0;
-  let reliability = 0;
-
-// Base single drive performance values (relative units)
-const baseDriveReadSpeed = 150; // MB/s
-const baseDriveWriteSpeed = 140; // MB/s
-
-// SnapRAID specific calculation
-if (config.fileSystem === 'SnapRAID') {
-  const parityDrives = parseInt(config.raidType.split(' ')[0]);
-  if (config.selectedDrives.length > parityDrives) {
-// Sort drives by size in descending order
-    const sortedDrives = [...config.selectedDrives].sort((a, b) => b.size - a.size);
-
-// The largest drives are used for parity in SnapRAID
-    const parityDrivesSize = sortedDrives.slice(0, parityDrives).reduce((sum, drive) => sum + drive.size, 0);
-    const dataDrivesSize = sortedDrives.slice(parityDrives).reduce((sum, drive) => sum + drive.size, 0);
-
-    available = dataDrivesSize;
-    protection = parityDrivesSize;
-
-// SnapRAID performance characteristics
-    readSpeed = baseDriveReadSpeed * 0.95;
-    writeSpeed = baseDriveWriteSpeed * 0.9;
-reliability = Math.min(95, 50 + (parityDrives * 15)); // Up to 95% with sufficient parity drives
-} else {
-  available = 0;
-  protection = totalRawStorage;
-  readSpeed = 0;
-  writeSpeed = 0;
-  reliability = 0;
-}
-} else {
-// Non-SnapRAID calculation
-  switch(config.raidType) {
-    case 'RAID 0':
-    case 'Striped':
-    available = totalRawStorage;
-    protection = 0;
-    readSpeed = baseDriveReadSpeed * config.selectedDrives.length * 0.9;
-    writeSpeed = baseDriveWriteSpeed * config.selectedDrives.length * 0.9;
-    reliability = 0;
-    break;
-    case 'RAID 1':
-    case 'Mirror':
-    available = config.selectedDrives.length > 0 ? Math.min(...config.selectedDrives.map(d => d.size)) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * Math.min(config.selectedDrives.length, 2) * 0.9;
-    writeSpeed = baseDriveWriteSpeed * 0.95;
-    reliability = 90;
-    break;
-    case 'RAID 5':
-    case 'RAID-Z1':
-    case 'SHR':
-    case '1 Parity':
-    available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 1) * 0.8;
-    writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 1) * 0.7;
-    reliability = 70;
-    break;
-    case 'RAID 6':
-    case 'RAID-Z2':
-    case 'SHR-2':
-    case '2 Parity':
-    case 'Parity 2':
-    available = config.selectedDrives.length > 2 ? totalRawStorage - (2 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 2) * 0.8;
-    writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 2) * 0.6;
-    reliability = 85;
-    break;
-    case 'Parity 1':
-    available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
-    writeSpeed = baseDriveWriteSpeed * 0.6;
-    reliability = 70;
-    break;
-    case 'Parity 3':
-    case 'RAID-Z3':
-    case '3 Parity':
-    available = config.selectedDrives.length > 3 ? totalRawStorage - (3 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-    protection = totalRawStorage - available;
-    if (config.raidType === 'Parity 3') {
-      readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
-      writeSpeed = baseDriveWriteSpeed * 0.35;
+      // Calculate write speed with parallelism boost
+      let writeSpeed = 0;
+      if (vdevStats.length > 0) {
+        const avgWriteSpeed = vdevStats.reduce((sum, stat) => sum + stat.writeSpeed, 0) / vdevStats.length;
+        const parallelismBoost = Math.min(1.8, 0.9 + (vdevStats.length * 0.15));
+        writeSpeed = avgWriteSpeed * parallelismBoost;
+      }
+      
+      // Overall reliability is limited by the least reliable vdev
+      const reliability = vdevStats.length > 0 ? 
+      Math.min(...vdevStats.map(stat => stat.reliability)) : 0;
+      
+      // Calculate formatted capacity based on file system overhead
+      const overheadPercentage = 0.08; // ZFS typically has 5-10% overhead
+      const formatted = Math.max(0, available) * (1 - overheadPercentage);
+      
+      return { 
+        total: totalRawStorage, 
+        available, 
+        protection,
+        formatted,
+        readSpeed: Math.max(0, Math.round(readSpeed)),
+        writeSpeed: Math.max(0, Math.round(writeSpeed)),
+        reliability
+      };
     } else {
-      readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 3) * 0.8;
-      writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 3) * 0.5;
-    }
-    reliability = 95;
-    break;
-    case '4 Parity':
-    available = config.selectedDrives.length > 4 ? totalRawStorage - (4 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 4) * 0.8;
-    writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 4) * 0.4;
-    reliability = 96;
-    break;
-    case '5 Parity':
-    available = config.selectedDrives.length > 5 ? totalRawStorage - (5 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 5) * 0.8;
-    writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 5) * 0.35;
-    reliability = 97;
-    break;
-    case '6 Parity':
-    available = config.selectedDrives.length > 6 ? totalRawStorage - (6 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 6) * 0.8;
-    writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 6) * 0.3;
-    reliability = 98;
-    break;
-    case 'RAID 10':
-    available = totalRawStorage / 2;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed * (config.selectedDrives.length / 2) * 0.95;
-    writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length / 2) * 0.9;
-    reliability = 80;
-    break;
-    default:
-    available = totalRawStorage / 2;
-    protection = totalRawStorage - available;
-    readSpeed = baseDriveReadSpeed;
-    writeSpeed = baseDriveWriteSpeed;
-    reliability = 50;
-  }
-}
-
-// Calculate formatted capacity based on file system overhead
-const overheadPercentages: { [key: string]: number } = {
-  'ZFS': 0.08,
-  'Unraid': 0.03,
-  'Synology SHR': 0.085,
-  'Synology BTRFS': 0.12,
-  'SnapRAID': 0.01,
-  'Standard': 0.05
-};
-
-const overheadPercentage = overheadPercentages[config.fileSystem] || 0.05;
-const formatted = Math.max(0, available) * (1 - overheadPercentage);
-
-return { 
-  total: totalRawStorage, 
-  available: Math.max(0, available), 
-  protection: Math.max(0, protection),
-  formatted: Math.max(0, formatted),
-  readSpeed: Math.max(0, Math.round(readSpeed)),
-  writeSpeed: Math.max(0, Math.round(writeSpeed)),
-  reliability: Math.max(0, Math.min(100, reliability))
-};
-}
-};
-
-// Calculate stats for both configurations
-const configStats = configs.map(calculateStorage);
-
-// Compare the two configurations and determine which is better in each category
-const comparisonResult = useMemo(() => {
-  if (!showComparisonMode) return null;
-
-  const stats1 = configStats[0];
-  const stats2 = configStats[1];
-
-  return {
-    capacity: {
-      winner: stats1.formatted > stats2.formatted ? 0 : stats1.formatted < stats2.formatted ? 1 : null,
-      difference: Math.abs(stats1.formatted - stats2.formatted).toFixed(1),
-      percentDiff: stats1.formatted && stats2.formatted ? 
-      Math.abs(((stats1.formatted - stats2.formatted) / Math.min(stats1.formatted, stats2.formatted)) * 100).toFixed(1) : '0'
-    },
-    efficiency: {
-      winner: (stats1.available / stats1.total) > (stats2.available / stats2.total) ? 0 : 
-      (stats1.available / stats1.total) < (stats2.available / stats2.total) ? 1 : null,
-      difference: Math.abs((stats1.available / stats1.total) - (stats2.available / stats2.total)).toFixed(2),
-      percentDiff: (stats1.available && stats2.available) ? 
-      Math.abs((((stats1.available / stats1.total) - (stats2.available / stats2.total)) / 
-        Math.min((stats1.available / stats1.total), (stats2.available / stats2.total))) * 100).toFixed(1) : '0'
-    },
-    readSpeed: {
-      winner: stats1.readSpeed > stats2.readSpeed ? 0 : stats1.readSpeed < stats2.readSpeed ? 1 : null,
-      difference: Math.abs(stats1.readSpeed - stats2.readSpeed),
-      percentDiff: (stats1.readSpeed && stats2.readSpeed) ?
-      Math.abs(((stats1.readSpeed - stats2.readSpeed) / Math.min(stats1.readSpeed, stats2.readSpeed)) * 100).toFixed(1) : '0'
-    },
-    writeSpeed: {
-      winner: stats1.writeSpeed > stats2.writeSpeed ? 0 : stats1.writeSpeed < stats2.writeSpeed ? 1 : null,
-      difference: Math.abs(stats1.writeSpeed - stats2.writeSpeed),
-      percentDiff: (stats1.writeSpeed && stats2.writeSpeed) ?
-      Math.abs(((stats1.writeSpeed - stats2.writeSpeed) / Math.min(stats1.writeSpeed, stats2.writeSpeed)) * 100).toFixed(1) : '0'
-    },
-    reliability: {
-      winner: stats1.reliability > stats2.reliability ? 0 : stats1.reliability < stats2.reliability ? 1 : null,
-      difference: Math.abs(stats1.reliability - stats2.reliability),
-      percentDiff: (stats1.reliability && stats2.reliability) ?
-      Math.abs(((stats1.reliability - stats2.reliability) / Math.min(stats1.reliability, stats2.reliability)) * 100).toFixed(1) : '0'
+      // Standard calculation for non-ZFS or ZFS without vdevs
+      if (config.selectedDrives.length === 0) return { 
+        total: 0, 
+        available: 0, 
+        protection: 0, 
+        formatted: 0,
+        readSpeed: 0,
+        writeSpeed: 0,
+        reliability: 0
+      };
+      
+      const totalRawStorage = config.selectedDrives.reduce((sum, drive) => sum + drive.size, 0);
+      let available = 0;
+      let protection = 0;
+      let readSpeed = 0;
+      let writeSpeed = 0;
+      let reliability = 0;
+      
+      // Base single drive performance values (relative units)
+      const baseDriveReadSpeed = 150; // MB/s
+      const baseDriveWriteSpeed = 140; // MB/s
+      
+      // SnapRAID specific calculation
+      if (config.fileSystem === 'SnapRAID') {
+        const parityDrives = parseInt(config.raidType.split(' ')[0]);
+        if (config.selectedDrives.length > parityDrives) {
+          // Sort drives by size in descending order
+          const sortedDrives = [...config.selectedDrives].sort((a, b) => b.size - a.size);
+          
+          // The largest drives are used for parity in SnapRAID
+          const parityDrivesSize = sortedDrives.slice(0, parityDrives).reduce((sum, drive) => sum + drive.size, 0);
+          const dataDrivesSize = sortedDrives.slice(parityDrives).reduce((sum, drive) => sum + drive.size, 0);
+          
+          available = dataDrivesSize;
+          protection = parityDrivesSize;
+          
+          // SnapRAID performance characteristics
+          readSpeed = baseDriveReadSpeed * 0.95;
+          writeSpeed = baseDriveWriteSpeed * 0.9;
+          reliability = Math.min(95, 50 + (parityDrives * 15)); // Up to 95% with sufficient parity drives
+        } else {
+          available = 0;
+          protection = totalRawStorage;
+          readSpeed = 0;
+          writeSpeed = 0;
+          reliability = 0;
+        }
+      } else {
+        // Non-SnapRAID calculation
+        switch(config.raidType) {
+          case 'RAID 0':
+          case 'Striped':
+          available = totalRawStorage;
+          protection = 0;
+          readSpeed = baseDriveReadSpeed * config.selectedDrives.length * 0.9;
+          writeSpeed = baseDriveWriteSpeed * config.selectedDrives.length * 0.9;
+          reliability = 0;
+          break;
+          case 'RAID 1':
+          case 'Mirror':
+          available = config.selectedDrives.length > 0 ? Math.min(...config.selectedDrives.map(d => d.size)) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * Math.min(config.selectedDrives.length, 2) * 0.9;
+          writeSpeed = baseDriveWriteSpeed * 0.95;
+          reliability = 90;
+          break;
+          case 'RAID 5':
+          case 'RAID-Z1':
+          case 'SHR':
+          case '1 Parity':
+          available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 1) * 0.8;
+          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 1) * 0.7;
+          reliability = 70;
+          break;
+          case 'RAID 6':
+          case 'RAID-Z2':
+          case 'SHR-2':
+          case '2 Parity':
+          case 'Parity 2':
+          available = config.selectedDrives.length > 2 ? totalRawStorage - (2 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 2) * 0.8;
+          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 2) * 0.6;
+          reliability = 85;
+          break;
+          case 'Parity 1':
+          available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
+          writeSpeed = baseDriveWriteSpeed * 0.6;
+          reliability = 70;
+          break;
+          case 'Parity 3':
+          case 'RAID-Z3':
+          case '3 Parity':
+          available = config.selectedDrives.length > 3 ? totalRawStorage - (3 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
+          protection = totalRawStorage - available;
+          if (config.raidType === 'Parity 3') {
+            readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
+            writeSpeed = baseDriveWriteSpeed * 0.35;
+          } else {
+            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 3) * 0.8;
+            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 3) * 0.5;
+          }
+          reliability = 95;
+          break;
+          case '4 Parity':
+          available = config.selectedDrives.length > 4 ? totalRawStorage - (4 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 4) * 0.8;
+          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 4) * 0.4;
+          reliability = 96;
+          break;
+          case '5 Parity':
+          available = config.selectedDrives.length > 5 ? totalRawStorage - (5 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 5) * 0.8;
+          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 5) * 0.35;
+          reliability = 97;
+          break;
+          case '6 Parity':
+          available = config.selectedDrives.length > 6 ? totalRawStorage - (6 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 6) * 0.8;
+          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 6) * 0.3;
+          reliability = 98;
+          break;
+          case 'RAID 10':
+          available = totalRawStorage / 2;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length / 2) * 0.95;
+          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length / 2) * 0.9;
+          reliability = 80;
+          break;
+          default:
+          available = totalRawStorage / 2;
+          protection = totalRawStorage - available;
+          readSpeed = baseDriveReadSpeed;
+          writeSpeed = baseDriveWriteSpeed;
+          reliability = 50;
+        }
+      }
+      
+      // Calculate formatted capacity based on file system overhead
+      const overheadPercentages: { [key: string]: number } = {
+        'ZFS': 0.08,
+        'Unraid': 0.03,
+        'Synology SHR': 0.085,
+        'Synology BTRFS': 0.12,
+        'SnapRAID': 0.01,
+        'Standard': 0.05
+      };
+      
+      const overheadPercentage = overheadPercentages[config.fileSystem] || 0.05;
+      const formatted = Math.max(0, available) * (1 - overheadPercentage);
+      
+      return { 
+        total: totalRawStorage, 
+        available: Math.max(0, available), 
+        protection: Math.max(0, protection),
+        formatted: Math.max(0, formatted),
+        readSpeed: Math.max(0, Math.round(readSpeed)),
+        writeSpeed: Math.max(0, Math.round(writeSpeed)),
+        reliability: Math.max(0, Math.min(100, reliability))
+      };
     }
   };
-}, [showComparisonMode, configStats]);
-
-// Get total number of drives (selected + in vdevs) for a config
-const getTotalDrivesCount = (config: StorageConfig) => {
-  return config.selectedDrives.length + config.vdevs.reduce((sum, vdev) => sum + vdev.drives.length, 0);
-};
-
-// Render a storage configuration
-const renderStorageConfig = (config: StorageConfig, index: number, stats: any) => {
-  return (
-    <div className={`${showComparisonMode ? 'w-full' : ''}`}>
-{/* File System and RAID type selection in a single row */}
-    <div className="flex flex-wrap items-center gap-4 mb-6">
-    <div>
-    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">File System</label>
-    <select 
-    className="w-48 border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-    value={config.fileSystem}
-    onChange={(e) => updateConfig(index, { fileSystem: e.target.value })}
+  
+  // Calculate stats for both configurations
+  const configStats = configs.map(calculateStorage);
+  
+  // Compare the two configurations and determine which is better in each category
+  const comparisonResult = useMemo(() => {
+    if (!showComparisonMode) return null;
+    
+    const stats1 = configStats[0];
+    const stats2 = configStats[1];
+    
+    return {
+      capacity: {
+        winner: stats1.formatted > stats2.formatted ? 0 : stats1.formatted < stats2.formatted ? 1 : null,
+        difference: Math.abs(stats1.formatted - stats2.formatted).toFixed(1),
+        percentDiff: stats1.formatted && stats2.formatted ? 
+        Math.abs(((stats1.formatted - stats2.formatted) / Math.min(stats1.formatted, stats2.formatted)) * 100).toFixed(1) : '0'
+      },
+      efficiency: {
+        winner: (stats1.available / stats1.total) > (stats2.available / stats2.total) ? 0 : 
+        (stats1.available / stats1.total) < (stats2.available / stats2.total) ? 1 : null,
+        difference: Math.abs((stats1.available / stats1.total) - (stats2.available / stats2.total)).toFixed(2),
+        percentDiff: (stats1.available && stats2.available) ? 
+        Math.abs((((stats1.available / stats1.total) - (stats2.available / stats2.total)) / 
+          Math.min((stats1.available / stats1.total), (stats2.available / stats2.total))) * 100).toFixed(1) : '0'
+      },
+      readSpeed: {
+        winner: stats1.readSpeed > stats2.readSpeed ? 0 : stats1.readSpeed < stats2.readSpeed ? 1 : null,
+        difference: Math.abs(stats1.readSpeed - stats2.readSpeed),
+        percentDiff: (stats1.readSpeed && stats2.readSpeed) ?
+        Math.abs(((stats1.readSpeed - stats2.readSpeed) / Math.min(stats1.readSpeed, stats2.readSpeed)) * 100).toFixed(1) : '0'
+      },
+      writeSpeed: {
+        winner: stats1.writeSpeed > stats2.writeSpeed ? 0 : stats1.writeSpeed < stats2.writeSpeed ? 1 : null,
+        difference: Math.abs(stats1.writeSpeed - stats2.writeSpeed),
+        percentDiff: (stats1.writeSpeed && stats2.writeSpeed) ?
+        Math.abs(((stats1.writeSpeed - stats2.writeSpeed) / Math.min(stats1.writeSpeed, stats2.writeSpeed)) * 100).toFixed(1) : '0'
+      },
+      reliability: {
+        winner: stats1.reliability > stats2.reliability ? 0 : stats1.reliability < stats2.reliability ? 1 : null,
+        difference: Math.abs(stats1.reliability - stats2.reliability),
+        percentDiff: (stats1.reliability && stats2.reliability) ?
+        Math.abs(((stats1.reliability - stats2.reliability) / Math.min(stats1.reliability, stats2.reliability)) * 100).toFixed(1) : '0'
+      }
+    };
+  }, [showComparisonMode, configStats]);
+  
+  // Get total number of drives (selected + in vdevs) for a config
+  const getTotalDrivesCount = (config: StorageConfig) => {
+    return config.selectedDrives.length + config.vdevs.reduce((sum, vdev) => sum + vdev.drives.length, 0);
+  };
+  
+  // Render a storage configuration
+  const renderStorageConfig = (config: StorageConfig, index: number, stats: any) => {
+    return (
+      <div className={`${showComparisonMode ? 'w-full' : ''}`}>
+        {/* File System and RAID type selection in a single row */}
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+      <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">File System</label>
+      <select 
+      className="w-48 border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+      value={config.fileSystem}
+      onChange={(e) => updateConfig(index, { fileSystem: e.target.value })}
+      >
+      {Object.keys(raidOptions).map(fs => (
+        <option key={fs} value={fs}>{fs}</option>
+      ))}
+      </select>
+      {config.fileSystem === 'SnapRAID' && (
+        <button 
+        className="ml-2 text-blue-600 hover:underline text-sm"
+        onClick={() => setShowSnapraidInfo(true)}
+      >
+      What is SnapRAID?
+      </button>
+    )}
+    </div>
+    
+          {/* RAID type selection - only show if not using ZFS with vdevs */}
+    {!(config.fileSystem === 'ZFS' && config.vdevs.length > 0) && (
+      <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RAID types</label>
+      <div className="flex items-center gap-2 relative">
+      <select 
+      className="w-48 border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+      value={config.raidType}
+      onChange={(e) => updateConfig(index, { raidType: e.target.value })}
     >
-    {Object.keys(raidOptions).map(fs => (
-      <option key={fs} value={fs}>{fs}</option>
-    ))}
+    {raidOptions[config.fileSystem as keyof typeof raidOptions].map(type => (
+      <option key={type} value={type}>{type}</option>
+      ))}
     </select>
-    {config.fileSystem === 'SnapRAID' && (
-      <button 
-      className="ml-2 text-blue-600 hover:underline text-sm"
-      onClick={() => setShowSnapraidInfo(true)}
-    >
-    What is SnapRAID?
-    </button>
-  )}
-  </div>
-
-{/* RAID type selection - only show if not using ZFS with vdevs */}
-  {!(config.fileSystem === 'ZFS' && config.vdevs.length > 0) && (
-    <div>
-    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RAID types</label>
-    <div className="flex items-center gap-2 relative">
-    <select 
-    className="w-48 border border-gray-300 rounded-md px-3 py-2 text-gray-800 bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-    value={config.raidType}
-    onChange={(e) => updateConfig(index, { raidType: e.target.value })}
-  >
-  {raidOptions[config.fileSystem as keyof typeof raidOptions].map(type => (
-    <option key={type} value={type}>{type}</option>
-    ))}
-  </select>
-  <div 
-  className="bg-gray-800 text-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-sm cursor-pointer"
-  onClick={() => setShowRaidInfo(!showRaidInfo)}
+    <div 
+    className="bg-gray-800 text-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-sm cursor-pointer"
+    onClick={() => setShowRaidInfo(!showRaidInfo)}
 >?</div>
 </div>
 </div>
 )}
 
-    {/* Option to copy from other config */}
+          {/* Option to copy from other config */}
 {showComparisonMode && getTotalDrivesCount(configs[1 - index]) > 0 && (
   <button 
   className="mt-6 py-1 px-3 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-sm"
@@ -637,7 +637,7 @@ Copy drives from {configs[1 - index].fileSystem}
 )}
 </div>
 
-{/* Display vdevs if ZFS is selected */}
+        {/* Display vdevs if ZFS is selected */}
 {config.fileSystem === 'ZFS' && config.vdevs.length > 0 && (
   <div className="mb-6">
   <div className="flex items-center justify-between mb-4">
@@ -677,8 +677,8 @@ What are vdevs?
       </svg>
       </button>
       </div>
-
-          {/* vdev drives */}
+      
+                    {/* vdev drives */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-3">
       {vdev.drives.map(drive => (
         <div 
@@ -689,8 +689,8 @@ What are vdevs?
         </div>
         ))}
       </div>
-
-            {/* vdev stats */}
+      
+                    {/* vdev stats */}
       <div className="grid grid-cols-3 gap-3 text-sm">
       <div>
       <span className="text-gray-500 dark:text-gray-400">Raw:</span> {vdevStats.total.toFixed(1)} TB
@@ -708,12 +708,12 @@ What are vdevs?
       </div>
       </div>
     )}
-
-          {/* Simple bar graph for storage visualization */}
+  
+        {/* Simple bar graph for storage visualization */}
   {(config.selectedDrives.length > 0 || config.vdevs.length > 0) && (
     <div className="mb-6">
     <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Storage Distribution</h3>
-
+    
     <div className="mb-4">
     <div className="flex w-full rounded-md overflow-hidden h-8">
     {stats.available > 0 && (
@@ -724,7 +724,7 @@ What are vdevs?
       {stats.available.toFixed(1)} TB
       </div>
       )}
-
+      
       {stats.protection > 0 && (
         <div 
         className="bg-blue-500 flex items-center justify-center text-xs text-gray-800"
@@ -735,7 +735,7 @@ What are vdevs?
         )}
         </div>
         </div>
-
+        
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-sm text-gray-800 dark:text-gray-200 mb-4">
       <div className="flex items-center gap-1">
@@ -747,7 +747,7 @@ What are vdevs?
       <span>Protection</span>
       </div>
       </div>
-
+      
     {/* Storage summary */}
     <div className="space-y-4">
   {/* Storage capacity metrics */}
@@ -774,7 +774,7 @@ What are vdevs?
     </div>
     </div>
     </div>
-
+    
   {/* Performance metrics */}
   <div>
   <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">Performance Metrics</h3>
@@ -830,7 +830,7 @@ What are vdevs?
   );
 };
 
-// Render a single drive slot
+  // Render a single drive slot
 const renderDriveSlot = (index: number, config: StorageConfig) => {
   const drive = config.selectedDrives[index];
   return (
@@ -857,40 +857,18 @@ const renderDriveSlot = (index: number, config: StorageConfig) => {
 
 return (
   <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
-  <div className="mb-8">
+  <div className="flex justify-between items-center mb-8">
   <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100">Storage Planner</h1>
+  
+        {/* Comparison Mode Toggle */}
+  
   </div>
-  <div className="flex flex-wrap gap-2 mb-6">
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-  {driveSizes.map(size => (
-    <button
-    key={size}
-    className="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-center"
-    onClick={() => addDrive(size)}
-    >
-    {size} TB
-    </button>
-    ))}
-  </div>
-
-  {/* Moved Comparison Mode Toggle */}
-  <button
-  className={`py-2 px-4 rounded ${
-    showComparisonMode 
-    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-  }`}
-  onClick={() => setShowComparisonMode(!showComparisonMode)}
-  >
-  {showComparisonMode ? 'Exit Comparison' : 'Compare RAID Types'}
-  </button>
-  </div>
-
-    {/* Step 1: Select drives */}
+  
+      {/* Step 1: Select drives */}
   <div className="mb-10">
   <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Select drives</h2>
-
-      {/* Drive size options */}
+  
+{/* Drive size options */}
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-6">
   {driveSizes.map(size => (
     <button
@@ -901,18 +879,28 @@ return (
     {size} TB
     </button>
     ))}
+  <button
+  className={`py-2 px-4 rounded ${
+    showComparisonMode 
+    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+  }`}
+  onClick={() => setShowComparisonMode(!showComparisonMode)}
+  >
+  {showComparisonMode ? 'Exit Comparison' : 'Compare'}
+  </button>
   </div>
-
+  
   {!showComparisonMode ? (
           // Regular mode: Show one set of drives
     <>
-          {/* Selected drives visualization */}
+            {/* Selected drives visualization */}
     <div className="bg-gray-800 p-4 rounded-lg">
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
     {[...Array(16)].map((_, index) => renderDriveSlot(index, configs[activeConfigIndex]))}
     </div>
     </div>
-
+    
     <div className="flex justify-between mt-4">
     <div className="text-gray-800 dark:text-gray-200">
     Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
@@ -938,7 +926,7 @@ return (
     </div>
     </>
     ) : (
-            // Comparison mode: Show tabs and two sets of drives
+          // Comparison mode: Show tabs and two sets of drives
     <>
             {/* Configuration tabs */}
     <div className="flex mb-4">
@@ -956,14 +944,14 @@ return (
       </button>
       ))}
     </div>
-
-              {/* Active configuration drives */}
+    
+            {/* Active configuration drives */}
     <div className="bg-gray-800 p-4 rounded-lg">
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
     {[...Array(16)].map((_, index) => renderDriveSlot(index, configs[activeConfigIndex]))}
     </div>
     </div>
-
+    
     <div className="flex justify-between mt-4">
     <div className="text-gray-800 dark:text-gray-200">
     Unassigned drives: {configs[activeConfigIndex].selectedDrives.length} / 
@@ -996,13 +984,13 @@ return (
     </>
     )}
     </div>
-
-              {/* Step 2: Configuration & results */}
+    
+      {/* Step 2: Configuration & results */}
     {!showComparisonMode ? (
-                  // Regular mode: Single configuration
+        // Regular mode: Single configuration
       renderStorageConfig(configs[0], 0, configStats[0])
       ) : (
-                  // Comparison mode: Two configurations side by side
+        // Comparison mode: Two configurations side by side
       <div>
       <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200 mb-4">Compare Configurations</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1015,14 +1003,14 @@ return (
         </div>
         ))}
       </div>
-
-                  {/* Comparison results */}
+      
+          {/* Comparison results */}
       {comparisonResult && configStats[0].total > 0 && configStats[1].total > 0 && (
         <div className="mt-8 p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
         <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Comparison Results</h3>
-
+        
         <div className="space-y-4">
-                      {/* Capacity comparison */}
+                {/* Capacity comparison */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
         <div className="font-medium text-gray-700 dark:text-gray-300">Usable Capacity</div>
         <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
@@ -1060,8 +1048,8 @@ return (
             )}
             </div>
             </div>
-
-                        {/* Efficiency comparison */}
+            
+                {/* Efficiency comparison */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
             <div className="font-medium text-gray-700 dark:text-gray-300">Storage Efficiency</div>
             <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
@@ -1096,8 +1084,8 @@ return (
                 )}
                 </div>
                 </div>
-
-                          {/* Read Speed comparison */}
+                
+                {/* Read Speed comparison */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                 <div className="font-medium text-gray-700 dark:text-gray-300">Read Speed</div>
                 <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
@@ -1135,8 +1123,8 @@ return (
                     )}
                     </div>
                     </div>
-
-                            {/* Write Speed comparison */}
+                    
+                {/* Write Speed comparison */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                     <div className="font-medium text-gray-700 dark:text-gray-300">Write Speed</div>
                     <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
@@ -1174,8 +1162,8 @@ return (
                         )}
                         </div>
                         </div>
-
-                              {/* Reliability comparison */}
+                        
+                {/* Reliability comparison */}
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                         <div className="font-medium text-gray-700 dark:text-gray-300">Reliability</div>
                         <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center">
@@ -1210,30 +1198,30 @@ return (
                             )}
                             </div>
                             </div>
-
-                                {/* Overall Recommendation */}
+                            
+                {/* Overall Recommendation */}
                             <div className="mt-6 p-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
                             <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Recommendation</h4>
                             {(() => {
-                                    // Count advantages for each configuration
+                    // Count advantages for each configuration
                               let config1Advantages = 0;
                               let config2Advantages = 0;
-
+                              
                               if (comparisonResult.capacity.winner === 0) config1Advantages++;
                               if (comparisonResult.capacity.winner === 1) config2Advantages++;
-
+                              
                               if (comparisonResult.efficiency.winner === 0) config1Advantages++;
                               if (comparisonResult.efficiency.winner === 1) config2Advantages++;
-
+                              
                               if (comparisonResult.readSpeed.winner === 0) config1Advantages++;
                               if (comparisonResult.readSpeed.winner === 1) config2Advantages++;
-
+                              
                               if (comparisonResult.writeSpeed.winner === 0) config1Advantages++;
                               if (comparisonResult.writeSpeed.winner === 1) config2Advantages++;
-
+                              
                               if (comparisonResult.reliability.winner === 0) config1Advantages++;
                               if (comparisonResult.reliability.winner === 1) config2Advantages++;
-
+                              
                               if (config1Advantages > config2Advantages) {
                                 return (
                                   <div className="text-gray-800 dark:text-gray-200">
@@ -1257,7 +1245,7 @@ return (
                                 </div>
                                 );
                               } else {
-                                          // Count tiebreakers
+                      // Count tiebreakers
                                 if (configStats[0].reliability > configStats[1].reliability) {
                                   return (
                                     <div className="text-gray-800 dark:text-gray-200">
@@ -1302,7 +1290,7 @@ return (
 </div>
 )}
 
-                                  {/* Modals - Same as in original code */}
+      {/* Modals - Same as in original code */}
 {showVdevManager && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
   <div 
@@ -1310,7 +1298,7 @@ return (
   className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full"
   >
   <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Create vdev</h3>
-
+  
   <div className="mb-4">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">vdev Type</label>
   <select 
@@ -1323,7 +1311,7 @@ return (
     ))}
   </select>
   </div>
-
+  
   <div className="mb-4">
   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
   Selected Drives: {configs[activeConfigIndex].selectedDrives.length}
@@ -1345,7 +1333,7 @@ return (
     )}
     </div>
     </div>
-
+    
     <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
     <p>Minimum drives needed:</p>
     <ul className="list-disc pl-5 mt-1">
@@ -1356,7 +1344,7 @@ return (
     <li>Striped: 2 drives (no redundancy)</li>
     </ul>
     </div>
-
+    
     <div className="flex justify-end gap-2">
     <button 
     className="py-2 px-4 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
@@ -1378,8 +1366,8 @@ return (
     </div>
     )}
 
-                                    {/* Other modals would remain the same as in the original code */}
-                                      {/* vdev Info modal */}
+      {/* Other modals would remain the same as in the original code */}
+      {/* vdev Info modal */}
 {showVdevInfo && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
   <div 
@@ -1397,14 +1385,14 @@ return (
   </svg>
   </button>
   </div>
-
-                                          {/* vdev info content - same as original */}
+  
+            {/* vdev info content - same as original */}
   <div className="space-y-4 text-gray-700 dark:text-gray-300">
   <p>
   In ZFS, a virtual device (vdev) is a group of physical drives that acts as a single storage unit.
   Multiple vdevs are combined to create a ZFS pool, which serves as the overall storage system.
   </p>
-
+  
   <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">vdev Types</h4>
   <ul className="list-disc pl-5 space-y-2">
   <li><strong>RAID-Z1 (Similar to RAID 5)</strong>: Requires minimum 3 drives, offers single drive redundancy.</li>
@@ -1413,7 +1401,7 @@ return (
   <li><strong>Mirror (Similar to RAID 1)</strong>: Data is duplicated across all drives in the vdev.</li>
   <li><strong>Striped (Similar to RAID 0)</strong>: Data is striped across all drives with no redundancy.</li>
   </ul>
-
+  
   <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">ZFS Pool Architecture</h4>
   <p>
   A ZFS pool combines multiple vdevs in a RAID-0 (striped) arrangement. This means:
@@ -1423,14 +1411,14 @@ return (
   <li>Performance can scale with the number of vdevs</li>
   <li>If one entire vdev fails, the entire pool fails</li>
   </ul>
-
+  
   <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Common vdev Configurations</h4>
   <ul className="list-disc pl-5 space-y-2">
   <li><strong>Multiple RAID-Z2 vdevs</strong>: Good balance of performance, capacity, and redundancy</li>
   <li><strong>Multiple mirror vdevs</strong>: Best performance, but lower capacity efficiency</li>
   <li><strong>Mixed vdev types</strong>: Not recommended for production, but supported</li>
   </ul>
-
+  
   <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Best Practices</h4>
   <ul className="list-disc pl-5 space-y-2">
   <li>Use identical drives within each vdev for optimal performance</li>
@@ -1443,7 +1431,7 @@ return (
   </div>
   )}
 
-                                          {/* SnapRAID Info modal and RAID Info modal would remain the same */}
+      {/* SnapRAID Info modal and RAID Info modal would remain the same */}
 </div>
 );
 };
