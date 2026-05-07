@@ -1,7 +1,7 @@
 export interface Drive {
   id: number;
   size: number;
-  type?: 'hdd' | 'nvme';
+  type?: 'hdd' | 'nvme' | 'nvme-ent';
 }
 
 export interface RaidStats {
@@ -24,7 +24,7 @@ export function formatDriveSize(sizeInTB: number): string {
 
 function getBaseSpeeds(drives: Drive[]): { r: number; w: number } {
   if (drives.length === 0) return { r: BASE_READ_HDD, w: BASE_WRITE_HDD };
-  const nvmeCount = drives.filter(d => d.type === 'nvme').length;
+  const nvmeCount = drives.filter(d => d.type === 'nvme' || d.type === 'nvme-ent').length;
   if (nvmeCount === drives.length) return { r: BASE_READ_NVME, w: BASE_WRITE_NVME };
   if (nvmeCount > 0) return { r: BASE_READ_HDD * 2, w: BASE_WRITE_HDD * 2 };
   return { r: BASE_READ_HDD, w: BASE_WRITE_HDD };
