@@ -1,5 +1,11 @@
 # storage-planner
 
+## 1.3.0
+
+### Minor Changes
+
+- b81e436: Add enterprise NVMe drive type with distinct amber caddy visual, move Compare toggle to section header, and fix SnapRAID NaN crash on filesystem switch.
+
 ## 1.1.0
 
 ### Minor Changes
