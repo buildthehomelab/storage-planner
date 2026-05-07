@@ -124,7 +124,7 @@ const RAIDCalculator = () => {
   const vdevInfoRef = useRef<HTMLDivElement>(null);
   const snapraidInfoRef = useRef<HTMLDivElement>(null);
 
-  const driveSizes = [30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1];
+  const driveSizes = [48, 40, 32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1];
 
   const raidOptions = useMemo(() => ({
     'ZFS': ['RAID-Z1', 'RAID-Z2', 'RAID-Z3', 'Mirror', 'Striped'],
