@@ -19,6 +19,9 @@
     "react": "^18",
     "react-dom": "^18"
   },
+  "overrides": {
+    "postcss": "^8.5.14"
+  },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@types/node": "^20",
