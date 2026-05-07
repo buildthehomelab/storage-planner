@@ -69,6 +69,39 @@ const VDEV_MIN_DRIVES: Record<string, number> = {
   'Striped': 2,
 };
 
+const FS_DESCRIPTIONS: Record<string, { tagline: string; detail: string }> = {
+  'ZFS':            { tagline: 'Copy-on-write pool',      detail: 'Checksummed, self-healing. Groups drives into vdevs.' },
+  'Unraid':         { tagline: 'Parity-protected array',  detail: 'Each data drive is independently accessible. Mixes sizes.' },
+  'Synology SHR':   { tagline: 'Synology Hybrid RAID',   detail: 'Auto-optimizes capacity when mixing different drive sizes.' },
+  'Synology BTRFS': { tagline: 'Synology + BTRFS',       detail: 'Adds CoW snapshots and checksums to Synology RAID.' },
+  'SnapRAID':       { tagline: 'Snapshot parity',         detail: 'Parity computed periodically. Best for large media libraries.' },
+  'Standard':       { tagline: 'Traditional RAID',        detail: 'Classic RAID via mdadm or hardware controller.' },
+};
+
+const RAID_DESCRIPTIONS: Record<string, { canFail: string; efficiency: string; minDrives: string }> = {
+  'RAID-Z1':  { canFail: '1 drive',     efficiency: 'n−1',    minDrives: '3' },
+  'RAID-Z2':  { canFail: '2 drives',    efficiency: 'n−2',    minDrives: '4' },
+  'RAID-Z3':  { canFail: '3 drives',    efficiency: 'n−3',    minDrives: '5' },
+  'Mirror':   { canFail: '1 per pair',  efficiency: '50%',    minDrives: '2' },
+  'Striped':  { canFail: 'none',        efficiency: '100%',   minDrives: '1' },
+  'Parity 1': { canFail: '1 drive',     efficiency: 'n−1',    minDrives: '2' },
+  'Parity 2': { canFail: '2 drives',    efficiency: 'n−2',    minDrives: '3' },
+  'Parity 3': { canFail: '3 drives',    efficiency: 'n−3',    minDrives: '4' },
+  'SHR':      { canFail: '1 drive',     efficiency: 'varies', minDrives: '2' },
+  'SHR-2':    { canFail: '2 drives',    efficiency: 'varies', minDrives: '4' },
+  'RAID 0':   { canFail: 'none',        efficiency: '100%',   minDrives: '2' },
+  'RAID 1':   { canFail: '1 drive',     efficiency: '50%',    minDrives: '2' },
+  'RAID 5':   { canFail: '1 drive',     efficiency: 'n−1',    minDrives: '3' },
+  'RAID 6':   { canFail: '2 drives',    efficiency: 'n−2',    minDrives: '4' },
+  'RAID 10':  { canFail: '1 per pair',  efficiency: '50%',    minDrives: '4' },
+  '1 Parity': { canFail: '1 drive',     efficiency: 'n−1',    minDrives: '2' },
+  '2 Parity': { canFail: '2 drives',    efficiency: 'n−2',    minDrives: '3' },
+  '3 Parity': { canFail: '3 drives',    efficiency: 'n−3',    minDrives: '4' },
+  '4 Parity': { canFail: '4 drives',    efficiency: 'n−4',    minDrives: '5' },
+  '5 Parity': { canFail: '5 drives',    efficiency: 'n−5',    minDrives: '6' },
+  '6 Parity': { canFail: '6 drives',    efficiency: 'n−6',    minDrives: '7' },
+};
+
 const RAIDCalculator = () => {
   const [driveSize, setDriveSize] = useState(20);
   const [showComparisonMode, setShowComparisonMode] = useState(false);
@@ -80,6 +113,7 @@ const RAIDCalculator = () => {
   ]);
 
   const [showRaidInfo, setShowRaidInfo] = useState(false);
+  const [raidInfoFileSystem, setRaidInfoFileSystem] = useState('ZFS');
   const [showVdevManager, setShowVdevManager] = useState(false);
   const [showVdevInfo, setShowVdevInfo] = useState(false);
   const [showSnapraidInfo, setShowSnapraidInfo] = useState(false);
@@ -111,14 +145,37 @@ const RAIDCalculator = () => {
     });
   };
 
+  // Only normalize raidType when fileSystem changes — not on every config update.
+  // Vdev drives are returned to selectedDrives instead of silently deleted.
+  const prevFileSystems = useRef(configs.map(c => c.fileSystem));
   useEffect(() => {
     configs.forEach((config, index) => {
+      const fsChanged = config.fileSystem !== prevFileSystems.current[index];
+      prevFileSystems.current[index] = config.fileSystem;
       if (!raidOptions[config.fileSystem as keyof typeof raidOptions].includes(config.raidType)) {
-        updateConfig(index, { raidType: raidOptions[config.fileSystem as keyof typeof raidOptions][0] });
-        if (config.fileSystem !== 'ZFS') updateConfig(index, { vdevs: [] });
+        const firstOption = raidOptions[config.fileSystem as keyof typeof raidOptions][0];
+        if (config.fileSystem !== 'ZFS' && config.vdevs.length > 0) {
+          // Return all vdev drives to the unassigned pool instead of deleting them
+          const freedDrives = config.vdevs.flatMap(v => v.drives).map(d => ({ ...d, id: Date.now() + Math.random() }));
+          updateConfig(index, {
+            raidType: firstOption,
+            vdevs: [],
+            selectedDrives: [...config.selectedDrives, ...freedDrives],
+          });
+        } else {
+          updateConfig(index, { raidType: firstOption });
+        }
+      } else if (fsChanged && config.fileSystem !== 'ZFS' && config.vdevs.length > 0) {
+        // fileSystem changed away from ZFS — return vdev drives even if raidType happened to match
+        const freedDrives = config.vdevs.flatMap(v => v.drives).map(d => ({ ...d, id: Date.now() + Math.random() }));
+        updateConfig(index, {
+          vdevs: [],
+          selectedDrives: [...config.selectedDrives, ...freedDrives],
+        });
       }
     });
-  }, [configs, raidOptions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configs.map(c => c.fileSystem).join(','), configs.map(c => c.raidType).join(',')]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -131,10 +188,16 @@ const RAIDCalculator = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [raidInfoRef, vdevManagerRef, vdevInfoRef, snapraidInfoRef]);
 
+  const [driveCapHit, setDriveCapHit] = useState(false);
+
   const addDrive = (size: number) => {
     const activeConfig = configs[activeConfigIndex];
-    if (activeConfig.selectedDrives.length < 24) {
+    const totalDrives = activeConfig.selectedDrives.length + activeConfig.vdevs.reduce((s, v) => s + v.drives.length, 0);
+    if (totalDrives < 24) {
       updateConfig(activeConfigIndex, { selectedDrives: [...activeConfig.selectedDrives, { id: Date.now(), size }] });
+      setDriveCapHit(false);
+    } else {
+      setDriveCapHit(true);
     }
   };
 
@@ -155,21 +218,26 @@ const RAIDCalculator = () => {
     setShowVdevManager(false);
   };
 
-  const removeVdev = (id: number) => {
-    const activeConfig = configs[activeConfigIndex];
-    const vdevToRemove = activeConfig.vdevs.find(vdev => vdev.id === id);
+  const removeVdev = (id: number, configIndex: number) => {
+    const config = configs[configIndex];
+    const vdevToRemove = config.vdevs.find(vdev => vdev.id === id);
     if (vdevToRemove) {
-      updateConfig(activeConfigIndex, {
-        selectedDrives: [...activeConfig.selectedDrives, ...vdevToRemove.drives],
-        vdevs: activeConfig.vdevs.filter(vdev => vdev.id !== id),
+      updateConfig(configIndex, {
+        selectedDrives: [...config.selectedDrives, ...vdevToRemove.drives],
+        vdevs: config.vdevs.filter(vdev => vdev.id !== id),
       });
     }
   };
 
   const copyDrives = (fromIndex: number, toIndex: number) => {
-    const sourceDrives = [...configs[fromIndex].selectedDrives];
-    if (sourceDrives.length === 0) return;
-    const newDrives = sourceDrives.map(drive => ({ id: Date.now() + Math.random(), size: drive.size }));
+    const src = configs[fromIndex];
+    // Collect all drives: unassigned + all vdev drives
+    const allDrives = [
+      ...src.selectedDrives,
+      ...src.vdevs.flatMap(v => v.drives),
+    ];
+    if (allDrives.length === 0) return;
+    const newDrives = allDrives.map(drive => ({ id: Date.now() + Math.random(), size: drive.size }));
     updateConfig(toIndex, { selectedDrives: [...configs[toIndex].selectedDrives, ...newDrives] });
   };
 
@@ -263,8 +331,8 @@ const RAIDCalculator = () => {
     return (
       <div>
         {/* File system + RAID type row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '28px', alignItems: 'flex-end' }}>
-          <div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '28px', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label className="nw-label">File System</label>
             <select
               className="nw-select"
@@ -274,15 +342,25 @@ const RAIDCalculator = () => {
             >
               {Object.keys(raidOptions).map(fs => <option key={fs} value={fs}>{fs}</option>)}
             </select>
-            {config.fileSystem === 'SnapRAID' && (
-              <button className="link-btn" style={{ marginLeft: '10px', fontSize: '12px' }} onClick={() => setShowSnapraidInfo(true)}>
-                What is SnapRAID?
-              </button>
+            {FS_DESCRIPTIONS[config.fileSystem] && (
+              <div style={{ width: '180px' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ok)', display: 'block', marginBottom: '2px' }}>
+                  {FS_DESCRIPTIONS[config.fileSystem].tagline}
+                </span>
+                <span style={{ fontFamily: 'var(--sans)', fontSize: '11px', color: 'var(--ink-3)', lineHeight: '1.4', display: 'block' }}>
+                  {FS_DESCRIPTIONS[config.fileSystem].detail}
+                </span>
+                {config.fileSystem === 'SnapRAID' && (
+                  <button className="link-btn" style={{ marginTop: '4px', fontSize: '11px' }} onClick={() => setShowSnapraidInfo(true)}>
+                    Learn more →
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
           {!(config.fileSystem === 'ZFS' && config.vdevs.length > 0) && (
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label className="nw-label">RAID Type</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <select
@@ -295,8 +373,28 @@ const RAIDCalculator = () => {
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
-                <button className="info-btn" onClick={() => setShowRaidInfo(!showRaidInfo)}>?</button>
+                <button className="info-btn" onClick={() => { setRaidInfoFileSystem(config.fileSystem); setShowRaidInfo(!showRaidInfo); }}>?</button>
               </div>
+              {RAID_DESCRIPTIONS[config.raidType] && (
+                <div style={{ width: '180px' }}>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      <span style={{ color: 'var(--ink-3)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Can lose</span>
+                      <span style={{ color: RAID_DESCRIPTIONS[config.raidType].canFail === 'none' ? 'var(--ink-3)' : 'var(--ok)' }}>
+                        {RAID_DESCRIPTIONS[config.raidType].canFail}
+                      </span>
+                    </span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      <span style={{ color: 'var(--ink-3)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Efficiency</span>
+                      <span style={{ color: 'var(--accent)' }}>{RAID_DESCRIPTIONS[config.raidType].efficiency}</span>
+                    </span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      <span style={{ color: 'var(--ink-3)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Min drives</span>
+                      <span style={{ color: 'var(--ink-2)' }}>{RAID_DESCRIPTIONS[config.raidType].minDrives}</span>
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -341,7 +439,7 @@ const RAIDCalculator = () => {
                       </span>
                       <button
                         className="link-btn link-btn--crit"
-                        onClick={() => { setActiveConfigIndex(index); removeVdev(vdev.id); }}
+                        onClick={() => removeVdev(vdev.id, index)}
                         title="Remove vdev"
                       >
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -527,11 +625,22 @@ const RAIDCalculator = () => {
         </div>
 
         {/* Drive count + actions */}
+        {driveCapHit && (
+          <div style={{
+            marginBottom: '8px', padding: '8px 12px',
+            background: 'rgba(250,127,170,0.08)', border: '1px solid rgba(250,127,170,0.25)',
+            borderRadius: '4px', fontFamily: 'var(--sans)', fontSize: '12px', color: 'var(--crit)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span>Maximum 24 drives per config reached.</span>
+            <button className="link-btn link-btn--crit" style={{ fontSize: '11px' }} onClick={() => setDriveCapHit(false)}>dismiss</button>
+          </div>
+        )}
         <div className="drive-info">
           <div className="drive-count">
             <span>{configs[activeConfigIndex].selectedDrives.length}</span> unassigned
             {' · '}
-            <span>{getTotalDrivesCount(configs[activeConfigIndex])}</span> total
+            <span>{getTotalDrivesCount(configs[activeConfigIndex])}</span> / 24 total
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {configs[activeConfigIndex].fileSystem === 'ZFS' && (
@@ -742,15 +851,40 @@ const RAIDCalculator = () => {
               </button>
             </div>
             <div className="modal-prose">
-              {[
-                ['RAID 0 / Striped', 'Data striped across all drives. Maximum performance, no redundancy. Any single drive failure = full data loss.'],
-                ['RAID 1 / Mirror', 'Data mirrored across all drives. 1 drive usable regardless of count. Survives all-but-one drive failures.'],
-                ['RAID 5', 'Single parity distributed across drives. Loses 1 drive to parity. Tolerates 1 drive failure.'],
-                ['RAID 6 / RAID-Z2', 'Double parity. Loses 2 drives to parity. Tolerates 2 simultaneous failures.'],
-                ['RAID 10', 'Mirror + stripe. Pairs of mirrored drives striped together. Excellent performance and redundancy, 50% efficiency.'],
-                ['RAID-Z1', 'ZFS single parity (like RAID 5). Minimum 3 drives. Full integrity checking with checksums.'],
-                ['RAID-Z3', 'ZFS triple parity. Minimum 5 drives. Tolerates 3 simultaneous failures.'],
-              ].map(([name, desc]) => (
+              {((): [string, string][] => {
+                if (raidInfoFileSystem === 'ZFS') return [
+                  ['RAID-Z1', 'ZFS single parity. Min 3 drives. Tolerates 1 drive failure. Full integrity with checksums.'],
+                  ['RAID-Z2', 'ZFS double parity. Min 4 drives. Tolerates 2 simultaneous failures. Recommended for most pools.'],
+                  ['RAID-Z3', 'ZFS triple parity. Min 5 drives. Tolerates 3 simultaneous failures. Mission-critical data.'],
+                  ['Mirror', 'Full mirroring within the vdev. 50% efficiency. Fastest reads. Can lose all-but-one drive.'],
+                  ['Striped', 'No redundancy — RAID-0. Maximum capacity and speed. Any failure = pool loss.'],
+                ];
+                if (raidInfoFileSystem === 'Unraid') return [
+                  ['Parity 1', '1 parity drive. Tolerates 1 drive failure. Remaining drives keep full capacity.'],
+                  ['Parity 2', '2 parity drives. Tolerates 2 simultaneous failures.'],
+                  ['Parity 3', '3 parity drives. Tolerates 3 simultaneous failures. Maximum protection for Unraid.'],
+                ];
+                if (raidInfoFileSystem === 'SnapRAID') return [
+                  ['1–6 Parity', 'SnapRAID uses 1–6 largest drives as parity. Parity is computed on-demand, not in real-time.'],
+                  ['Data drives', 'All non-parity drives store data at full capacity. Mixed sizes are supported.'],
+                ];
+                if (raidInfoFileSystem === 'Synology SHR' || raidInfoFileSystem === 'Synology BTRFS') return [
+                  ['SHR', 'Synology Hybrid RAID. Tolerates 1 drive failure. Optimizes capacity when mixing drive sizes.'],
+                  ['SHR-2', 'SHR with 2-drive redundancy. Tolerates 2 simultaneous failures. Min 4 drives.'],
+                  ['RAID 0', 'Striped, no redundancy. Max capacity. Any failure = full data loss.'],
+                  ['RAID 1', 'Full mirror across 2 drives. 50% efficiency. Survives 1 failure.'],
+                  ['RAID 5', 'Single parity across 3+ drives. n−1 usable. Tolerates 1 failure.'],
+                  ['RAID 6', 'Double parity across 4+ drives. n−2 usable. Tolerates 2 failures.'],
+                  ['RAID 10', 'Mirror + stripe. 50% efficiency. Excellent performance and redundancy.'],
+                ];
+                return [
+                  ['RAID 0', 'Striped. No redundancy. Max performance and capacity. Any failure = full data loss.'],
+                  ['RAID 1', 'Full mirror. 50% efficiency. Survives all-but-one drive failure.'],
+                  ['RAID 5', 'Single parity. n−1 usable drives. Tolerates 1 drive failure.'],
+                  ['RAID 6', 'Double parity. n−2 usable drives. Tolerates 2 simultaneous failures.'],
+                  ['RAID 10', 'Mirror + stripe. 50% efficiency. Best balance of performance and redundancy.'],
+                ];
+              })().map(([name, desc]) => (
                 <div key={name} style={{ padding: '12px 0', borderBottom: '1px solid var(--rule-soft)' }}>
                   <strong>{name}</strong>
                   <p style={{ margin: '4px 0 0', color: 'var(--ink-3)', fontSize: '13px' }}>{desc}</p>
