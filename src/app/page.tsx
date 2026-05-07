@@ -61,6 +61,14 @@ const VdevManagerDriveGrid = ({ drives }: { drives: Drive[] }) => (
   </div>
 );
 
+const VDEV_MIN_DRIVES: Record<string, number> = {
+  'RAID-Z1': 3,
+  'RAID-Z2': 4,
+  'RAID-Z3': 5,
+  'Mirror': 2,
+  'Striped': 2,
+};
+
 const RAIDCalculator = () => {
   const [driveSize, setDriveSize] = useState(20);
   const [showComparisonMode, setShowComparisonMode] = useState(false);
@@ -678,19 +686,41 @@ const RAIDCalculator = () => {
 
             <div style={{ fontFamily: 'var(--sans)', fontSize: '12px', color: 'var(--ink-3)', marginBottom: '20px', lineHeight: 1.6 }}>
               {[['RAID-Z1', '3+ drives · 1 drive redundancy'], ['RAID-Z2', '4+ drives · 2 drive redundancy'], ['RAID-Z3', '5+ drives · 3 drive redundancy'], ['Mirror', '2+ drives · 1:1 mirroring'], ['Striped', '2+ drives · no redundancy']].map(([t, d]) => (
-                <div key={t} style={{ display: 'flex', gap: '8px', padding: '3px 0', borderBottom: '1px solid var(--rule-soft)' }}>
-                  <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)', minWidth: '70px' }}>{t}</span>
+                <div key={t} style={{
+                  display: 'flex', gap: '8px', padding: '3px 0', borderBottom: '1px solid var(--rule-soft)',
+                  background: t === currentVdevType ? 'rgba(106,95,193,0.08)' : 'transparent',
+                  marginLeft: '-4px', marginRight: '-4px', paddingLeft: '4px', paddingRight: '4px',
+                  borderRadius: '2px',
+                }}>
+                  <span style={{ fontFamily: 'var(--mono)', color: t === currentVdevType ? 'var(--ok)' : 'var(--accent)', minWidth: '70px' }}>{t}</span>
                   <span>{d}</span>
                 </div>
               ))}
             </div>
+
+            {(() => {
+              const driveCount = configs[activeConfigIndex].selectedDrives.length;
+              const minDrives = VDEV_MIN_DRIVES[currentVdevType] ?? 2;
+              if (driveCount > 0 && driveCount < minDrives) {
+                return (
+                  <div style={{
+                    marginBottom: '16px', padding: '10px 12px',
+                    background: 'rgba(250,127,170,0.08)', border: '1px solid rgba(250,127,170,0.25)',
+                    borderRadius: '4px', fontFamily: 'var(--sans)', fontSize: '12px', color: 'var(--crit)',
+                  }}>
+                    {currentVdevType} requires at least {minDrives} drives — you have {driveCount} selected.
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn-ghost" onClick={() => setShowVdevManager(false)}>Cancel</button>
               <button
                 className="btn-primary"
                 onClick={createVdev}
-                disabled={configs[activeConfigIndex].selectedDrives.length === 0}
+                disabled={configs[activeConfigIndex].selectedDrives.length < (VDEV_MIN_DRIVES[currentVdevType] ?? 2)}
               >
                 Create vdev
               </button>
