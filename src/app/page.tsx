@@ -169,7 +169,7 @@ const RAIDCalculator = () => {
   // Add a drive to the active configuration
   const addDrive = (size: number) => {
     const activeConfig = configs[activeConfigIndex];
-    if (activeConfig.selectedDrives.length < 16) {
+    if (activeConfig.selectedDrives.length < 24) {
       const updatedDrives = [...activeConfig.selectedDrives, { id: Date.now(), size }];
       updateConfig(activeConfigIndex, { selectedDrives: updatedDrives });
     }
