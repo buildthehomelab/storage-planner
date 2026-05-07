@@ -20,6 +20,7 @@
   --sans:      var(--font-sans, "Rubik"), ui-sans-serif, sans-serif;
   --mono:      var(--font-mono, "JetBrains Mono"), ui-monospace, monospace;
   --nvme:      #00d4ff;
+  --nvme-ent:  #f0a500;
 }
 
 /* ── Base ──────────────────────────────────────── */
@@ -124,6 +125,15 @@ body {
 .drive-btn--nvme:hover {
   background: rgba(0, 212, 255, 0.1);
   border-color: var(--nvme);
+  color: #fff;
+}
+.drive-btn--nvme-ent {
+  border-color: rgba(240, 165, 0, 0.35);
+  color: var(--nvme-ent);
+}
+.drive-btn--nvme-ent:hover {
+  background: rgba(240, 165, 0, 0.1);
+  border-color: var(--nvme-ent);
   color: #fff;
 }
 
@@ -555,6 +565,16 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-top: 12px;
+}
+
+/* ── Caddy LED animations ──────────────────────── */
+@keyframes caddy-blink {
+  0%, 60%, 100% { opacity: 1; }
+  70%, 90% { opacity: 0.25; }
+}
+@keyframes caddy-blink-fast {
+  0%, 50%, 100% { opacity: 1; }
+  60%, 80% { opacity: 0.2; }
 }
 
 /* ── Animations ────────────────────────────────── */

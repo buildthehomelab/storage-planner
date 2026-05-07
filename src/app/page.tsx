@@ -43,13 +43,13 @@ const VdevManagerDriveGrid = ({ drives }: { drives: Drive[] }) => (
                 aspectRatio: '3/1',
                 borderRadius: '2px',
                 overflow: 'hidden',
-                border: drive.type === 'nvme' ? '1px solid rgba(0,212,255,0.35)' : '1px solid var(--rule)',
-                background: drive.type === 'nvme' ? 'rgba(0,10,18,0.95)' : 'var(--paper-2)',
+                border: drive.type === 'nvme' ? '1px solid rgba(0,212,255,0.35)' : drive.type === 'nvme-ent' ? '1px solid rgba(240,165,0,0.35)' : '1px solid var(--rule)',
+                background: drive.type === 'nvme' ? 'rgba(0,10,18,0.95)' : drive.type === 'nvme-ent' ? 'rgba(18,10,0,0.95)' : 'var(--paper-2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: drive.type === 'nvme' ? 'var(--nvme)' : 'var(--ink-2)' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: drive.type === 'nvme' ? 'var(--nvme)' : drive.type === 'nvme-ent' ? 'var(--nvme-ent)' : 'var(--ink-2)' }}>
                   {formatDriveSize(drive.size)}
                 </span>
               </div>
@@ -193,7 +193,7 @@ const RAIDCalculator = () => {
 
   const [driveCapHit, setDriveCapHit] = useState(false);
 
-  const addDrive = (size: number, type: 'hdd' | 'nvme' = 'hdd') => {
+  const addDrive = (size: number, type: 'hdd' | 'nvme' | 'nvme-ent' = 'hdd') => {
     const activeConfig = configs[activeConfigIndex];
     const totalDrives = activeConfig.selectedDrives.length + activeConfig.vdevs.reduce((s, v) => s + v.drives.length, 0);
     if (totalDrives < 24) {
@@ -290,7 +290,7 @@ const RAIDCalculator = () => {
       if (config.selectedDrives.length === 0) return { total: 0, available: 0, protection: 0, formatted: 0, readSpeed: 0, writeSpeed: 0, reliability: 0 };
       const totalRawStorage = config.selectedDrives.reduce((sum, drive) => sum + drive.size, 0);
       const stats = config.fileSystem === 'SnapRAID'
-        ? calcSnapRaid(config.selectedDrives, parseInt(config.raidType.split(' ')[0]))
+        ? calcSnapRaid(config.selectedDrives, parseInt(config.raidType.split(' ')[0]) || 1)
         : calcConfigRaid(config.raidType, config.selectedDrives);
       const overheadPct: { [key: string]: number } = {
         'ZFS': 0.08, 'Unraid': 0.03, 'Synology SHR': 0.085,
@@ -340,7 +340,7 @@ const RAIDCalculator = () => {
 
   const speedBarMax = (config: StorageConfig) => {
     const allDrives = [...config.selectedDrives, ...config.vdevs.flatMap(v => v.drives)];
-    return allDrives.length > 0 && allDrives.every(d => d.type === 'nvme') ? 25000 : 1500;
+    return allDrives.length > 0 && allDrives.every(d => d.type === 'nvme' || d.type === 'nvme-ent') ? 25000 : 1500;
   };
 
   const renderStorageConfig = (config: StorageConfig, index: number, stats: ReturnType<typeof calculateStorage>) => {
@@ -599,12 +599,41 @@ const RAIDCalculator = () => {
       <section style={{ marginBottom: '48px' }} className="rise rise-1">
         <div className="section-label">
           <span>Add Drives</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {(configs[activeConfigIndex].selectedDrives.length > 0 || configs[activeConfigIndex].vdevs.length > 0) && (
               <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)' }}>
                 click a bay to remove
               </span>
             )}
+            {/* Compare mode toggle */}
+            <button
+              onClick={() => setShowComparisonMode(!showComparisonMode)}
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: '10px',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                border: showComparisonMode ? '1px solid var(--ok)' : '1px solid var(--rule)',
+                background: showComparisonMode ? 'rgba(194,239,78,0.07)' : 'transparent',
+                color: showComparisonMode ? 'var(--ok)' : 'var(--ink-2)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'color 0.15s, border-color 0.15s, background 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.75 }}>
+                <rect x="0" y="0" width="4" height="10" rx="0.5" fill="currentColor" opacity="0.6"/>
+                <rect x="6" y="0" width="4" height="10" rx="0.5" fill="currentColor" opacity="0.6"/>
+              </svg>
+              {showComparisonMode ? 'Single' : 'Compare'}
+            </button>
+            {/* divider */}
+            <div style={{ width: 1, height: 16, background: 'var(--rule)', opacity: 0.5 }} />
             {/* HDD / NVMe toggle */}
             <div style={{
               display: 'flex', gap: '2px',
@@ -635,12 +664,6 @@ const RAIDCalculator = () => {
                 {size} TB
               </button>
             ))}
-            <button
-              className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
-              onClick={() => setShowComparisonMode(!showComparisonMode)}
-            >
-              {showComparisonMode ? '← Single' : 'Compare →'}
-            </button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
@@ -658,10 +681,19 @@ const RAIDCalculator = () => {
             {/* Enterprise / prosumer: ~6% over-provisioned, odd sizes */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
               <span
-                style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', minWidth: '60px', cursor: 'help' }}
+                style={{
+                  fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--nvme-ent)',
+                  textTransform: 'uppercase', letterSpacing: '0.1em', minWidth: '60px',
+                  cursor: 'help', display: 'flex', alignItems: 'center', gap: '4px',
+                }}
                 title="Over-provisioned: manufacturer reserves ~6% of NAND for wear leveling and garbage collection"
               >
-                Ent. OP
+                <span style={{
+                  fontSize: '7px', fontWeight: 700, background: 'rgba(240,165,0,0.15)',
+                  border: '1px solid rgba(240,165,0,0.4)', borderRadius: '2px',
+                  padding: '0px 3px', lineHeight: '12px', letterSpacing: '0.05em',
+                }}>OP</span>
+                ENT
               </span>
               {nvmeSizesEnterprise.map(size => {
                 const rawNand: Record<number, string> = {
@@ -669,21 +701,13 @@ const RAIDCalculator = () => {
                   1.92: '2 TB', 3.84: '4 TB', 7.68: '8 TB', 15.36: '16 TB',
                 };
                 return (
-                  <button key={size} className="drive-btn drive-btn--nvme" onClick={() => addDrive(size, 'nvme')}
+                  <button key={size} className="drive-btn drive-btn--nvme-ent" onClick={() => addDrive(size, 'nvme-ent')}
                     title={`${formatDriveSize(size)} user-visible · ${rawNand[size]} raw NAND (~6% over-provisioned)`}
                   >
                     {formatDriveSize(size)}
                   </button>
                 );
               })}
-            </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button
-                className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
-                onClick={() => setShowComparisonMode(!showComparisonMode)}
-              >
-                {showComparisonMode ? '← Single' : 'Compare →'}
-              </button>
             </div>
           </div>
         )}
