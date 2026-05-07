@@ -1,5 +1,11 @@
 # storage-planner
 
+## 1.3.1
+
+### Patch Changes
+
+- c356701: Remove decorative hero masthead from page header.
+
 ## 1.3.0
 
 ### Minor Changes
