@@ -49,13 +49,8 @@ const ServerRack: React.FC<ServerRackProps> = ({
         marginBottom: '10px',
         border: '1px solid var(--rule)',
       }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <div style={{ width: 18, height: 28, background: 'var(--rule)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 10, height: 10, background: '#1a73e8', borderRadius: '1px' }} />
-          </div>
-          <div style={{ width: 18, height: 28, background: 'var(--rule)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 10, height: 10, background: '#1a73e8', borderRadius: '1px' }} />
-          </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+          SRV-R2502 · 4U
         </div>
 
         <div style={{ display: 'flex', gap: '14px' }}>
@@ -76,9 +71,6 @@ const ServerRack: React.FC<ServerRackProps> = ({
           ))}
         </div>
 
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
-          SRV-R2502 · 4U
-        </div>
       </div>
 
       {/* Drive bays */}
@@ -211,6 +203,11 @@ const ServerRack: React.FC<ServerRackProps> = ({
       }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--ink-3)' }}>
           {drives.length}/{maxSlots} bays occupied
+          {drives.some(d => !d.type || d.type === 'hdd') && (
+            <span style={{ color: 'var(--ok)', marginLeft: '8px' }}>
+              {drives.filter(d => !d.type || d.type === 'hdd').length} HDD
+            </span>
+          )}
           {hasNvme && (
             <span style={{ color: 'var(--nvme)', marginLeft: '8px' }}>
               {drives.filter(d => d.type === 'nvme').length} NVMe
