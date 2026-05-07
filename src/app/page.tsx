@@ -231,14 +231,17 @@ const RAIDCalculator = () => {
 
   const copyDrives = (fromIndex: number, toIndex: number) => {
     const src = configs[fromIndex];
-    // Collect all drives: unassigned + all vdev drives
+    const dst = configs[toIndex];
     const allDrives = [
       ...src.selectedDrives,
       ...src.vdevs.flatMap(v => v.drives),
     ];
     if (allDrives.length === 0) return;
-    const newDrives = allDrives.map(drive => ({ id: Date.now() + Math.random(), size: drive.size }));
-    updateConfig(toIndex, { selectedDrives: [...configs[toIndex].selectedDrives, ...newDrives] });
+    const dstTotal = dst.selectedDrives.length + dst.vdevs.reduce((s, v) => s + v.drives.length, 0);
+    const slots = Math.max(0, 24 - dstTotal);
+    const newDrives = allDrives.slice(0, slots).map(drive => ({ id: Date.now() + Math.random(), size: drive.size }));
+    if (newDrives.length === 0) return;
+    updateConfig(toIndex, { selectedDrives: [...dst.selectedDrives, ...newDrives] });
   };
 
   const calculateVdevStorage = (vdev: Vdev) => {
