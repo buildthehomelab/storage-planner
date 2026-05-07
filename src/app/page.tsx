@@ -126,7 +126,8 @@ const RAIDCalculator = () => {
   const snapraidInfoRef = useRef<HTMLDivElement>(null);
 
   const driveSizes = [48, 40, 32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1];
-  const nvmeSizes = [16, 8, 4, 2, 1, 0.512, 0.256]; // stored in TB
+  const nvmeSizesStandard    = [16, 8, 4, 2, 1, 0.512, 0.256];           // power-of-2 NAND, full user capacity
+  const nvmeSizesEnterprise  = [15.36, 7.68, 3.84, 1.92, 0.96, 0.48, 0.24, 0.12]; // ~6% over-provisioned
 
   const raidOptions = useMemo(() => ({
     'ZFS': ['RAID-Z1', 'RAID-Z2', 'RAID-Z3', 'Mirror', 'Striped'],
@@ -627,27 +628,65 @@ const RAIDCalculator = () => {
         </div>
 
         {/* Drive size buttons */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '20px' }}>
-          {driveMediaType === 'hdd' ? (
-            driveSizes.map(size => (
+        {driveMediaType === 'hdd' ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '20px' }}>
+            {driveSizes.map(size => (
               <button key={size} className="drive-btn" onClick={() => addDrive(size, 'hdd')}>
                 {size} TB
               </button>
-            ))
-          ) : (
-            nvmeSizes.map(size => (
-              <button key={size} className="drive-btn drive-btn--nvme" onClick={() => addDrive(size, 'nvme')}>
-                {formatDriveSize(size)}
+            ))}
+            <button
+              className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
+              onClick={() => setShowComparisonMode(!showComparisonMode)}
+            >
+              {showComparisonMode ? '← Single' : 'Compare →'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+            {/* Standard (full user-visible capacity) */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--nvme)', textTransform: 'uppercase', letterSpacing: '0.1em', minWidth: '60px' }}>
+                Standard
+              </span>
+              {nvmeSizesStandard.map(size => (
+                <button key={size} className="drive-btn drive-btn--nvme" onClick={() => addDrive(size, 'nvme')}>
+                  {formatDriveSize(size)}
+                </button>
+              ))}
+            </div>
+            {/* Enterprise / prosumer: ~6% over-provisioned, odd sizes */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span
+                style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', minWidth: '60px', cursor: 'help' }}
+                title="Over-provisioned: manufacturer reserves ~6% of NAND for wear leveling and garbage collection"
+              >
+                Ent. OP
+              </span>
+              {nvmeSizesEnterprise.map(size => {
+                const rawNand: Record<number, string> = {
+                  0.12: '128 GB', 0.24: '256 GB', 0.48: '512 GB', 0.96: '1 TB',
+                  1.92: '2 TB', 3.84: '4 TB', 7.68: '8 TB', 15.36: '16 TB',
+                };
+                return (
+                  <button key={size} className="drive-btn drive-btn--nvme" onClick={() => addDrive(size, 'nvme')}
+                    title={`${formatDriveSize(size)} user-visible · ${rawNand[size]} raw NAND (~6% over-provisioned)`}
+                  >
+                    {formatDriveSize(size)}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
+                onClick={() => setShowComparisonMode(!showComparisonMode)}
+              >
+                {showComparisonMode ? '← Single' : 'Compare →'}
               </button>
-            ))
-          )}
-          <button
-            className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
-            onClick={() => setShowComparisonMode(!showComparisonMode)}
-          >
-            {showComparisonMode ? '← Single' : 'Compare →'}
-          </button>
-        </div>
+            </div>
+          </div>
+        )}
 
         {/* Comparison mode tabs */}
         {showComparisonMode && (
