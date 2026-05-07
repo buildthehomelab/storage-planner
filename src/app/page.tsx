@@ -3,12 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ServerRack from './ServerRack';
 import VdevRack from './VdevRack';
-
-// Interface for drive objects
-interface Drive {
-  id: number;
-  size: number;
-}
+import { type Drive, calcVdevRaid, calcConfigRaid, calcSnapRaid } from './raidCalc';
 
 // Interface for vdev objects
 interface Vdev {
@@ -256,102 +251,20 @@ const RAIDCalculator = () => {
   
   // Calculate storage stats for a single vdev
   const calculateVdevStorage = (vdev: Vdev) => {
-    if (vdev.drives.length === 0) return { 
-      total: 0, 
-      available: 0, 
-      protection: 0, 
-      formatted: 0,
-      readSpeed: 0,
-      writeSpeed: 0,
-      reliability: 0
+    if (vdev.drives.length === 0) return {
+      total: 0, available: 0, protection: 0, formatted: 0,
+      readSpeed: 0, writeSpeed: 0, reliability: 0
     };
-    
     const totalRawStorage = vdev.drives.reduce((sum, drive) => sum + drive.size, 0);
-    let available = 0;
-    let protection = 0;
-    let readSpeed = 0;
-    let writeSpeed = 0;
-    let reliability = 0;
-    
-    // Base single drive performance values (relative units)
-    const baseDriveReadSpeed = 150; // MB/s
-    const baseDriveWriteSpeed = 140; // MB/s
-    
-    switch(vdev.type) {
-      case 'RAID 0':
-      case 'Striped':
-      available = totalRawStorage;
-      protection = 0;
-        // Read/write scales with number of drives in RAID 0
-        readSpeed = baseDriveReadSpeed * vdev.drives.length * 0.9; // 90% efficiency
-        writeSpeed = baseDriveWriteSpeed * vdev.drives.length * 0.9; // 90% efficiency
-        reliability = 0; // No redundancy
-        break;
-        case 'RAID 1':
-        case 'Mirror':
-        // For mirrored configurations, available space is equal to the smallest drive's capacity
-        available = vdev.drives.length > 0 ? Math.min(...vdev.drives.map(d => d.size)) : 0;
-        protection = totalRawStorage - available;
-        // Read can benefit from multiple drives, write is limited to single drive
-        readSpeed = baseDriveReadSpeed * Math.min(vdev.drives.length, 2) * 0.9; // Read from multiple drives
-        writeSpeed = baseDriveWriteSpeed * 0.95; // Slightly slower than single drive
-        reliability = 90; // High reliability with full mirroring
-        break;
-        case 'RAID 5':
-        case 'RAID-Z1':
-        case 'Parity 1':
-        case 'SHR':
-        available = vdev.drives.length > 1 ? totalRawStorage - Math.max(...vdev.drives.map(d => d.size)) : 0;
-        protection = totalRawStorage - available;
-        // RAID 5 read is good, write has parity overhead
-        readSpeed = baseDriveReadSpeed * (vdev.drives.length - 1) * 0.8;
-        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 1) * 0.7; // Parity calculation slows writes
-        reliability = 70; // Can survive one drive failure
-        break;
-        case 'RAID 6':
-        case 'RAID-Z2':
-        case 'Parity 2':
-        case 'SHR-2':
-        available = vdev.drives.length > 2 ? totalRawStorage - (2 * Math.max(...vdev.drives.map(d => d.size))) : 0;
-        protection = totalRawStorage - available;
-        // RAID 6 read is good, write has double parity overhead
-        readSpeed = baseDriveReadSpeed * (vdev.drives.length - 2) * 0.8;
-        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 2) * 0.6; // Double parity calculation slows writes
-        reliability = 85; // Can survive two drive failures
-        break;
-        case 'RAID-Z3':
-        case 'Parity 3':
-        available = vdev.drives.length > 3 ? totalRawStorage - (3 * Math.max(...vdev.drives.map(d => d.size))) : 0;
-        protection = totalRawStorage - available;
-        // RAID Z3 read is good, write has triple parity overhead
-        readSpeed = baseDriveReadSpeed * (vdev.drives.length - 3) * 0.8;
-        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length - 3) * 0.5; // Triple parity calculation slows writes
-        reliability = 95; // Can survive three drive failures
-        break;
-        case 'RAID 10':
-        available = totalRawStorage / 2;
-        protection = totalRawStorage - available;
-        // RAID 10 has excellent read/write performance
-        readSpeed = baseDriveReadSpeed * (vdev.drives.length / 2) * 0.95;
-        writeSpeed = baseDriveWriteSpeed * (vdev.drives.length / 2) * 0.9;
-        reliability = 80; // Good reliability with mirroring
-        break;
-        default:
-        available = totalRawStorage / 2;
-        protection = totalRawStorage - available;
-        readSpeed = baseDriveReadSpeed;
-        writeSpeed = baseDriveWriteSpeed;
-        reliability = 50;
-      }
-      
-      return { 
-        total: totalRawStorage, 
-        available: Math.max(0, available), 
-        protection: Math.max(0, protection),
-      formatted: 0, // This will be calculated later
-      readSpeed: Math.max(0, Math.round(readSpeed)),
-      writeSpeed: Math.max(0, Math.round(writeSpeed)),
-      reliability: Math.max(0, Math.min(100, reliability))
+    const stats = calcVdevRaid(vdev.type, vdev.drives);
+    return {
+      total: totalRawStorage,
+      available: Math.max(0, stats.available),
+      protection: Math.max(0, stats.protection),
+      formatted: 0,
+      readSpeed: Math.max(0, Math.round(stats.readSpeed)),
+      writeSpeed: Math.max(0, Math.round(stats.writeSpeed)),
+      reliability: Math.max(0, Math.min(100, stats.reliability)),
     };
   };
   
@@ -413,138 +326,16 @@ const RAIDCalculator = () => {
       };
       
       const totalRawStorage = config.selectedDrives.reduce((sum, drive) => sum + drive.size, 0);
-      let available = 0;
-      let protection = 0;
-      let readSpeed = 0;
-      let writeSpeed = 0;
-      let reliability = 0;
-      
-      // Base single drive performance values (relative units)
-      const baseDriveReadSpeed = 150; // MB/s
-      const baseDriveWriteSpeed = 140; // MB/s
-      
-      // SnapRAID specific calculation
-      if (config.fileSystem === 'SnapRAID') {
-        const parityDrives = parseInt(config.raidType.split(' ')[0]);
-        if (config.selectedDrives.length > parityDrives) {
-          // Sort drives by size in descending order
-          const sortedDrives = [...config.selectedDrives].sort((a, b) => b.size - a.size);
-          
-          // The largest drives are used for parity in SnapRAID
-          const parityDrivesSize = sortedDrives.slice(0, parityDrives).reduce((sum, drive) => sum + drive.size, 0);
-          const dataDrivesSize = sortedDrives.slice(parityDrives).reduce((sum, drive) => sum + drive.size, 0);
-          
-          available = dataDrivesSize;
-          protection = parityDrivesSize;
-          
-          // SnapRAID performance characteristics
-          readSpeed = baseDriveReadSpeed * 0.95;
-          writeSpeed = baseDriveWriteSpeed * 0.9;
-          reliability = Math.min(95, 50 + (parityDrives * 15)); // Up to 95% with sufficient parity drives
-        } else {
-          available = 0;
-          protection = totalRawStorage;
-          readSpeed = 0;
-          writeSpeed = 0;
-          reliability = 0;
-        }
-      } else {
-        // Non-SnapRAID calculation
-        switch(config.raidType) {
-          case 'RAID 0':
-          case 'Striped':
-          available = totalRawStorage;
-          protection = 0;
-          readSpeed = baseDriveReadSpeed * config.selectedDrives.length * 0.9;
-          writeSpeed = baseDriveWriteSpeed * config.selectedDrives.length * 0.9;
-          reliability = 0;
-          break;
-          case 'RAID 1':
-          case 'Mirror':
-          available = config.selectedDrives.length > 0 ? Math.min(...config.selectedDrives.map(d => d.size)) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * Math.min(config.selectedDrives.length, 2) * 0.9;
-          writeSpeed = baseDriveWriteSpeed * 0.95;
-          reliability = 90;
-          break;
-          case 'RAID 5':
-          case 'RAID-Z1':
-          case 'SHR':
-          case '1 Parity':
-          available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 1) * 0.8;
-          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 1) * 0.7;
-          reliability = 70;
-          break;
-          case 'RAID 6':
-          case 'RAID-Z2':
-          case 'SHR-2':
-          case '2 Parity':
-          case 'Parity 2':
-          available = config.selectedDrives.length > 2 ? totalRawStorage - (2 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 2) * 0.8;
-          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 2) * 0.6;
-          reliability = 85;
-          break;
-          case 'Parity 1':
-          available = config.selectedDrives.length > 1 ? totalRawStorage - Math.max(...config.selectedDrives.map(d => d.size)) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
-          writeSpeed = baseDriveWriteSpeed * 0.6;
-          reliability = 70;
-          break;
-          case 'Parity 3':
-          case 'RAID-Z3':
-          case '3 Parity':
-          available = config.selectedDrives.length > 3 ? totalRawStorage - (3 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-          protection = totalRawStorage - available;
-          if (config.raidType === 'Parity 3') {
-            readSpeed = baseDriveReadSpeed * Math.min(1.5, config.selectedDrives.length * 0.2);
-            writeSpeed = baseDriveWriteSpeed * 0.35;
-          } else {
-            readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 3) * 0.8;
-            writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 3) * 0.5;
-          }
-          reliability = 95;
-          break;
-          case '4 Parity':
-          available = config.selectedDrives.length > 4 ? totalRawStorage - (4 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 4) * 0.8;
-          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 4) * 0.4;
-          reliability = 96;
-          break;
-          case '5 Parity':
-          available = config.selectedDrives.length > 5 ? totalRawStorage - (5 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 5) * 0.8;
-          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 5) * 0.35;
-          reliability = 97;
-          break;
-          case '6 Parity':
-          available = config.selectedDrives.length > 6 ? totalRawStorage - (6 * Math.max(...config.selectedDrives.map(d => d.size))) : 0;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length - 6) * 0.8;
-          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length - 6) * 0.3;
-          reliability = 98;
-          break;
-          case 'RAID 10':
-          available = totalRawStorage / 2;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed * (config.selectedDrives.length / 2) * 0.95;
-          writeSpeed = baseDriveWriteSpeed * (config.selectedDrives.length / 2) * 0.9;
-          reliability = 80;
-          break;
-          default:
-          available = totalRawStorage / 2;
-          protection = totalRawStorage - available;
-          readSpeed = baseDriveReadSpeed;
-          writeSpeed = baseDriveWriteSpeed;
-          reliability = 50;
-        }
-      }
+
+      const stats = config.fileSystem === 'SnapRAID'
+        ? calcSnapRaid(config.selectedDrives, parseInt(config.raidType.split(' ')[0]))
+        : calcConfigRaid(config.raidType, config.selectedDrives);
+
+      const available = stats.available;
+      const protection = stats.protection;
+      const readSpeed = stats.readSpeed;
+      const writeSpeed = stats.writeSpeed;
+      const reliability = stats.reliability;
       
       // Calculate formatted capacity based on file system overhead
       const overheadPercentages: { [key: string]: number } = {
