@@ -22,6 +22,10 @@ function maxDrive(drives: Drive[]): number {
   return Math.max(...drives.map(d => d.size));
 }
 
+function minDrive(drives: Drive[]): number {
+  return Math.min(...drives.map(d => d.size));
+}
+
 export function calcStriped(drives: Drive[]): RaidStats {
   const t = sumDrives(drives);
   return {
@@ -45,8 +49,47 @@ export function calcMirror(drives: Drive[]): RaidStats {
   };
 }
 
-// RAID 5 / RAID-Z1 / SHR — 1 parity drive (largest)
+// RAID 5 / RAID-Z1 — 1 distributed parity stripe; usable = (N-1) × smallest drive
 export function calcSingleParity(drives: Drive[]): RaidStats {
+  const t = sumDrives(drives);
+  const available = drives.length > 1 ? (drives.length - 1) * minDrive(drives) : 0;
+  return {
+    available,
+    protection: t - available,
+    readSpeed: BASE_READ * (drives.length - 1) * 0.8,
+    writeSpeed: BASE_WRITE * (drives.length - 1) * 0.7,
+    reliability: 70,
+  };
+}
+
+// RAID 6 / RAID-Z2 — 2 distributed parity stripes; usable = (N-2) × smallest drive, minimum 4 drives
+export function calcDoubleParity(drives: Drive[]): RaidStats {
+  const t = sumDrives(drives);
+  const available = drives.length > 3 ? (drives.length - 2) * minDrive(drives) : 0;
+  return {
+    available,
+    protection: t - available,
+    readSpeed: BASE_READ * (drives.length - 2) * 0.8,
+    writeSpeed: BASE_WRITE * (drives.length - 2) * 0.6,
+    reliability: 85,
+  };
+}
+
+// RAID-Z3 — 3 distributed parity stripes; usable = (N-3) × smallest drive, minimum 5 drives
+export function calcTripleParity(drives: Drive[]): RaidStats {
+  const t = sumDrives(drives);
+  const available = drives.length > 4 ? (drives.length - 3) * minDrive(drives) : 0;
+  return {
+    available,
+    protection: t - available,
+    readSpeed: BASE_READ * (drives.length - 3) * 0.8,
+    writeSpeed: BASE_WRITE * (drives.length - 3) * 0.5,
+    reliability: 95,
+  };
+}
+
+// SHR (Synology Hybrid RAID) — largest drive is parity; smaller drives use remaining space fully
+export function calcSHR(drives: Drive[]): RaidStats {
   const t = sumDrives(drives);
   const available = drives.length > 1 ? t - maxDrive(drives) : 0;
   return {
@@ -58,29 +101,16 @@ export function calcSingleParity(drives: Drive[]): RaidStats {
   };
 }
 
-// RAID 6 / RAID-Z2 / SHR-2 / Unraid Parity 2 — 2 parity drives
-export function calcDoubleParity(drives: Drive[]): RaidStats {
+// SHR-2 (Synology Hybrid RAID 2) — 2 largest drives are parity overhead; minimum 4 drives
+export function calcSHR2(drives: Drive[]): RaidStats {
   const t = sumDrives(drives);
-  const available = drives.length > 2 ? t - 2 * maxDrive(drives) : 0;
+  const available = drives.length > 3 ? t - 2 * maxDrive(drives) : 0;
   return {
     available,
     protection: t - available,
     readSpeed: BASE_READ * (drives.length - 2) * 0.8,
     writeSpeed: BASE_WRITE * (drives.length - 2) * 0.6,
     reliability: 85,
-  };
-}
-
-// RAID-Z3 — 3 parity drives
-export function calcTripleParity(drives: Drive[]): RaidStats {
-  const t = sumDrives(drives);
-  const available = drives.length > 3 ? t - 3 * maxDrive(drives) : 0;
-  return {
-    available,
-    protection: t - available,
-    readSpeed: BASE_READ * (drives.length - 3) * 0.8,
-    writeSpeed: BASE_WRITE * (drives.length - 3) * 0.5,
-    reliability: 95,
   };
 }
 
@@ -109,10 +139,27 @@ export function calcUnraidParity1(drives: Drive[]): RaidStats {
   };
 }
 
-// Unraid Parity 3 — lower sequential perf than Z3
+// Unraid Parity 2 — 2 largest drives are parity; data drives keep full capacity
+export function calcUnraidParity2(drives: Drive[]): RaidStats {
+  const t = sumDrives(drives);
+  if (drives.length <= 2) return { available: 0, protection: t, readSpeed: 0, writeSpeed: 0, reliability: 0 };
+  const sorted = [...drives].sort((a, b) => b.size - a.size);
+  const available = sorted.slice(2).reduce((s, d) => s + d.size, 0);
+  return {
+    available,
+    protection: t - available,
+    readSpeed: BASE_READ * Math.min(1.5, drives.length * 0.2),
+    writeSpeed: BASE_WRITE * 0.5,
+    reliability: 85,
+  };
+}
+
+// Unraid Parity 3 — 3 largest drives are parity; data drives keep full capacity
 export function calcUnraidParity3(drives: Drive[]): RaidStats {
   const t = sumDrives(drives);
-  const available = drives.length > 3 ? t - 3 * maxDrive(drives) : 0;
+  if (drives.length <= 3) return { available: 0, protection: t, readSpeed: 0, writeSpeed: 0, reliability: 0 };
+  const sorted = [...drives].sort((a, b) => b.size - a.size);
+  const available = sorted.slice(3).reduce((s, d) => s + d.size, 0);
   return {
     available,
     protection: t - available,
@@ -165,12 +212,12 @@ export const CONFIG_CALC_MAP: Record<string, (drives: Drive[]) => RaidStats> = {
   'Mirror':   calcMirror,
   'RAID 5':   calcSingleParity,
   'RAID-Z1':  calcSingleParity,
-  'SHR':      calcSingleParity,
+  'SHR':      calcSHR,
   'Parity 1': calcUnraidParity1,
   'RAID 6':   calcDoubleParity,
   'RAID-Z2':  calcDoubleParity,
-  'SHR-2':    calcDoubleParity,
-  'Parity 2': calcDoubleParity,
+  'SHR-2':    calcSHR2,
+  'Parity 2': calcUnraidParity2,
   'RAID-Z3':  calcTripleParity,
   'Parity 3': calcUnraidParity3,
   'RAID 10':  calcRaid10,

@@ -5,8 +5,11 @@ import {
   calcSingleParity,
   calcDoubleParity,
   calcTripleParity,
+  calcSHR,
+  calcSHR2,
   calcRaid10,
   calcUnraidParity1,
+  calcUnraidParity2,
   calcUnraidParity3,
   calcSnapRaid,
   calcVdevRaid,
@@ -56,11 +59,11 @@ describe('calcMirror (RAID 1)', () => {
   });
 });
 
-describe('calcSingleParity (RAID 5 / RAID-Z1 / SHR)', () => {
+describe('calcSingleParity (RAID 5 / RAID-Z1)', () => {
   // Browser-validated: 6×8TB RAID-Z1 → usable=40, efficiency=83.3%
-  it('available = total minus largest drive', () => {
+  it('equal drives: available = (N-1) × driveSize', () => {
     const r = calcSingleParity(drives6x8);
-    expect(r.available).toBe(40); // 48 - 8
+    expect(r.available).toBe(40); // 5 × 8
     expect(r.protection).toBe(8);
     expect(r.reliability).toBe(70);
   });
@@ -71,16 +74,24 @@ describe('calcSingleParity (RAID 5 / RAID-Z1 / SHR)', () => {
     expect(r.writeSpeed).toBeCloseTo(140 * 5 * 0.7); // 490
   });
 
+  it('mixed drives: available = (N-1) × smallest drive', () => {
+    // [8,8,8,8,4,4] — Synology-validated: available ≈ 20 TB decimal
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:8},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcSingleParity(mixed).available).toBe(20); // 5 × 4
+  });
+
   it('returns 0 usable with only 1 drive', () => {
     expect(calcSingleParity(makeDrives(1, 8)).available).toBe(0);
   });
 });
 
-describe('calcDoubleParity (RAID 6 / RAID-Z2 / SHR-2)', () => {
+describe('calcDoubleParity (RAID 6 / RAID-Z2)', () => {
   // Browser-validated: 6×8TB RAID-Z2 → usable=32, efficiency=66.7%
-  it('available = total minus 2 × largest drive', () => {
+  it('equal drives: available = (N-2) × driveSize', () => {
     const r = calcDoubleParity(drives6x8);
-    expect(r.available).toBe(32); // 48 - 16
+    expect(r.available).toBe(32); // 4 × 8
     expect(r.protection).toBe(16);
     expect(r.reliability).toBe(85);
   });
@@ -91,15 +102,24 @@ describe('calcDoubleParity (RAID 6 / RAID-Z2 / SHR-2)', () => {
     expect(r.writeSpeed).toBeCloseTo(140 * 4 * 0.6); // 336
   });
 
-  it('returns 0 usable with 2 or fewer drives', () => {
+  it('mixed drives: available = (N-2) × smallest drive', () => {
+    // [8,8,8,8,4,4] — Synology-validated: available ≈ 16 TB decimal
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:8},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcDoubleParity(mixed).available).toBe(16); // 4 × 4
+  });
+
+  it('returns 0 usable with 3 or fewer drives (minimum 4 for RAID 6/Z2)', () => {
     expect(calcDoubleParity(makeDrives(2, 8)).available).toBe(0);
+    expect(calcDoubleParity(makeDrives(3, 8)).available).toBe(0);
   });
 });
 
 describe('calcTripleParity (RAID-Z3)', () => {
-  it('available = total minus 3 × largest drive', () => {
+  it('equal drives: available = (N-3) × driveSize', () => {
     const r = calcTripleParity(drives6x8);
-    expect(r.available).toBe(24); // 48 - 24
+    expect(r.available).toBe(24); // 3 × 8
     expect(r.protection).toBe(24);
     expect(r.reliability).toBe(95);
   });
@@ -110,8 +130,54 @@ describe('calcTripleParity (RAID-Z3)', () => {
     expect(r.writeSpeed).toBeCloseTo(140 * 3 * 0.5); // 210
   });
 
-  it('returns 0 usable with 3 or fewer drives', () => {
+  it('mixed drives: available = (N-3) × smallest drive', () => {
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:4},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcTripleParity(mixed).available).toBe(12); // 3 × 4
+  });
+
+  it('returns 0 usable with 4 or fewer drives (minimum 5 for RAID-Z3)', () => {
     expect(calcTripleParity(makeDrives(3, 8)).available).toBe(0);
+    expect(calcTripleParity(makeDrives(4, 8)).available).toBe(0);
+  });
+});
+
+describe('calcSHR (Synology Hybrid RAID single-parity)', () => {
+  it('equal drives: same as RAID 5', () => {
+    const r = calcSHR(drives6x8);
+    expect(r.available).toBe(40); // t - max = 48 - 8
+    expect(r.protection).toBe(8);
+    expect(r.reliability).toBe(70);
+  });
+
+  it('mixed drives: available = total minus largest drive', () => {
+    // [8,8,8,8,4,4] — Synology-validated: available ≈ 32 TB decimal
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:8},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcSHR(mixed).available).toBe(32); // 40 - 8
+  });
+});
+
+describe('calcSHR2 (Synology Hybrid RAID dual-parity)', () => {
+  it('equal drives: same as RAID 6', () => {
+    const r = calcSHR2(drives6x8);
+    expect(r.available).toBe(32); // t - 2*max = 48 - 16
+    expect(r.protection).toBe(16);
+    expect(r.reliability).toBe(85);
+  });
+
+  it('mixed drives: available = total minus 2 × largest drive', () => {
+    // [8,8,8,8,4,4] — Synology-validated: available ≈ 24 TB decimal
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:8},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcSHR2(mixed).available).toBe(24); // 40 - 16
+  });
+
+  it('returns 0 usable with 3 or fewer drives', () => {
+    expect(calcSHR2(makeDrives(3, 8)).available).toBe(0);
   });
 });
 
@@ -143,14 +209,51 @@ describe('calcUnraidParity1', () => {
   });
 });
 
+describe('calcUnraidParity2', () => {
+  it('same capacity as double-parity for equal drives, Unraid speed profile', () => {
+    const r = calcUnraidParity2(drives6x8);
+    expect(r.available).toBe(32); // 4 data × 8 TB
+    expect(r.protection).toBe(16);
+    expect(r.reliability).toBe(85);
+    expect(r.readSpeed).toBeCloseTo(150 * Math.min(1.5, 6 * 0.2));
+    expect(r.writeSpeed).toBeCloseTo(140 * 0.5);
+  });
+
+  it('mixed sizes: 2 largest drives are parity', () => {
+    const mixed: Drive[] = [
+      { id: 0, size: 10 }, { id: 1, size: 8 }, { id: 2, size: 6 }, { id: 3, size: 4 },
+    ];
+    const r = calcUnraidParity2(mixed);
+    expect(r.available).toBe(10); // 6+4
+    expect(r.protection).toBe(18); // 10+8
+  });
+
+  it('returns 0 usable with 2 or fewer drives', () => {
+    expect(calcUnraidParity2(makeDrives(2, 8)).available).toBe(0);
+  });
+});
+
 describe('calcUnraidParity3', () => {
-  it('same capacity as triple-parity but Unraid speeds', () => {
+  it('same capacity as triple-parity for equal drives, Unraid speeds', () => {
     const r = calcUnraidParity3(drives6x8);
-    expect(r.available).toBe(24);
+    expect(r.available).toBe(24); // 3 data × 8 TB
     expect(r.protection).toBe(24);
     expect(r.reliability).toBe(95);
     expect(r.readSpeed).toBeCloseTo(150 * Math.min(1.5, 6 * 0.2));
     expect(r.writeSpeed).toBeCloseTo(140 * 0.35);
+  });
+
+  it('mixed sizes: 3 largest drives are parity', () => {
+    const mixed: Drive[] = [
+      { id: 0, size: 10 }, { id: 1, size: 8 }, { id: 2, size: 6 }, { id: 3, size: 4 },
+    ];
+    const r = calcUnraidParity3(mixed);
+    expect(r.available).toBe(4); // only 4 TB drive is data
+    expect(r.protection).toBe(24); // 10+8+6
+  });
+
+  it('returns 0 usable with 3 or fewer drives', () => {
+    expect(calcUnraidParity3(makeDrives(3, 8)).available).toBe(0);
   });
 });
 
@@ -216,13 +319,29 @@ describe('calcConfigRaid dispatcher', () => {
     expect(calcConfigRaid('Mirror', drives6x8).available).toBe(8);
     expect(calcConfigRaid('RAID 5', drives6x8).available).toBe(40);
     expect(calcConfigRaid('RAID-Z1', drives6x8).available).toBe(40);
-    expect(calcConfigRaid('SHR', drives6x8).available).toBe(40);
+    expect(calcConfigRaid('SHR', drives6x8).available).toBe(40);   // equal drives → same as RAID 5
     expect(calcConfigRaid('RAID 6', drives6x8).available).toBe(32);
     expect(calcConfigRaid('RAID-Z2', drives6x8).available).toBe(32);
-    expect(calcConfigRaid('SHR-2', drives6x8).available).toBe(32);
+    expect(calcConfigRaid('SHR-2', drives6x8).available).toBe(32); // equal drives → same as RAID 6
     expect(calcConfigRaid('Parity 2', drives6x8).available).toBe(32);
     expect(calcConfigRaid('RAID-Z3', drives6x8).available).toBe(24);
     expect(calcConfigRaid('RAID 10', drives6x8).available).toBe(24);
+  });
+
+  it('SHR and RAID 5 differ on mixed drives — Synology-validated', () => {
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:8},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcConfigRaid('SHR', mixed).available).toBe(32);   // t - max = 40 - 8
+    expect(calcConfigRaid('RAID 5', mixed).available).toBe(20); // (N-1) × min = 5 × 4
+  });
+
+  it('SHR-2 and RAID 6 differ on mixed drives — Synology-validated', () => {
+    const mixed: Drive[] = [
+      {id:0,size:8},{id:1,size:8},{id:2,size:8},{id:3,size:8},{id:4,size:4},{id:5,size:4}
+    ];
+    expect(calcConfigRaid('SHR-2', mixed).available).toBe(24);  // t - 2*max = 40 - 16
+    expect(calcConfigRaid('RAID 6', mixed).available).toBe(16); // (N-2) × min = 4 × 4
   });
 
   it('Parity 1 (Unraid) uses Unraid speed profile, not Z1 profile', () => {
