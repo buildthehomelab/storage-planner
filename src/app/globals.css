@@ -392,10 +392,18 @@ body {
   background: none;
   color: var(--ink-3);
   cursor: pointer;
-  padding: 4px;
-  transition: color 0.15s;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
 }
-.modal-close:hover { color: var(--ink); }
+.modal-close:hover { color: var(--ink); background: var(--paper-3); }
 
 /* ── Modal prose ───────────────────────────────── */
 .modal-prose {
