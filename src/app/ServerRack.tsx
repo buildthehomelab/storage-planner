@@ -18,7 +18,7 @@ interface ServerRackProps {
 const ServerRack: React.FC<ServerRackProps> = ({ 
   drives, 
   onDriveClick, 
-  maxSlots = 16 
+  maxSlots = 24
 }) => {
   // Calculate how many rows and columns we need
   const drivesPerRow = 4;
