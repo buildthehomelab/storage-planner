@@ -19,6 +19,7 @@
   --display:   var(--font-display, "Barlow Condensed"), ui-sans-serif, sans-serif;
   --sans:      var(--font-sans, "Rubik"), ui-sans-serif, sans-serif;
   --mono:      var(--font-mono, "JetBrains Mono"), ui-monospace, monospace;
+  --nvme:      #00d4ff;
 }
 
 /* ── Base ──────────────────────────────────────── */
@@ -115,6 +116,44 @@ body {
   border-color: var(--accent);
   color: var(--accent);
   background: rgba(106, 95, 193, 0.12);
+}
+.drive-btn--nvme {
+  border-color: rgba(0, 212, 255, 0.28);
+  color: var(--nvme);
+}
+.drive-btn--nvme:hover {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--nvme);
+  color: #fff;
+}
+
+/* ── Media type toggle ─────────────────────────── */
+.media-tab {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s;
+}
+.media-tab--hdd-active {
+  background: var(--paper);
+  color: var(--ok);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+.media-tab--nvme-active {
+  background: var(--paper);
+  color: var(--nvme);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+.media-tab:hover:not(.media-tab--hdd-active):not(.media-tab--nvme-active) {
+  color: var(--ink-2);
 }
 
 /* ── Select ────────────────────────────────────── */
