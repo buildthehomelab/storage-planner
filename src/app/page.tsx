@@ -588,13 +588,6 @@ const RAIDCalculator = () => {
 
   return (
     <div className="page">
-      {/* Masthead */}
-      <header className="masthead rise">
-        <div className="eyebrow">Storage Planner</div>
-        <h1>Plan Your Array.</h1>
-        <p className="sub">Visualize RAID configurations, estimate usable capacity and performance.</p>
-      </header>
-
       {/* Step 1: Select drives */}
       <section style={{ marginBottom: '48px' }} className="rise rise-1">
         <div className="section-label">
