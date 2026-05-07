@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ServerRack from './ServerRack';
 import VdevRack from './VdevRack';
-import { type Drive, calcVdevRaid, calcConfigRaid, calcSnapRaid } from './raidCalc';
+import { type Drive, calcVdevRaid, calcConfigRaid, calcSnapRaid, formatDriveSize } from './raidCalc';
 
 interface Vdev {
   id: number;
@@ -43,14 +43,14 @@ const VdevManagerDriveGrid = ({ drives }: { drives: Drive[] }) => (
                 aspectRatio: '3/1',
                 borderRadius: '2px',
                 overflow: 'hidden',
-                border: '1px solid var(--rule)',
-                background: 'var(--paper-2)',
+                border: drive.type === 'nvme' ? '1px solid rgba(0,212,255,0.35)' : '1px solid var(--rule)',
+                background: drive.type === 'nvme' ? 'rgba(0,10,18,0.95)' : 'var(--paper-2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--ink-2)' }}>
-                  {drive.size}TB
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: drive.type === 'nvme' ? 'var(--nvme)' : 'var(--ink-2)' }}>
+                  {formatDriveSize(drive.size)}
                 </span>
               </div>
             ))}
@@ -104,6 +104,7 @@ const RAID_DESCRIPTIONS: Record<string, { canFail: string; efficiency: string; m
 
 const RAIDCalculator = () => {
   const [driveSize, setDriveSize] = useState(20);
+  const [driveMediaType, setDriveMediaType] = useState<'hdd' | 'nvme'>('hdd');
   const [showComparisonMode, setShowComparisonMode] = useState(false);
   const [activeConfigIndex, setActiveConfigIndex] = useState(0);
 
@@ -125,6 +126,8 @@ const RAIDCalculator = () => {
   const snapraidInfoRef = useRef<HTMLDivElement>(null);
 
   const driveSizes = [48, 40, 32, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1];
+  const nvmeSizesStandard    = [16, 8, 4, 2, 1, 0.512, 0.256];           // power-of-2 NAND, full user capacity
+  const nvmeSizesEnterprise  = [15.36, 7.68, 3.84, 1.92, 0.96, 0.48, 0.24, 0.12]; // ~6% over-provisioned
 
   const raidOptions = useMemo(() => ({
     'ZFS': ['RAID-Z1', 'RAID-Z2', 'RAID-Z3', 'Mirror', 'Striped'],
@@ -190,11 +193,11 @@ const RAIDCalculator = () => {
 
   const [driveCapHit, setDriveCapHit] = useState(false);
 
-  const addDrive = (size: number) => {
+  const addDrive = (size: number, type: 'hdd' | 'nvme' = 'hdd') => {
     const activeConfig = configs[activeConfigIndex];
     const totalDrives = activeConfig.selectedDrives.length + activeConfig.vdevs.reduce((s, v) => s + v.drives.length, 0);
     if (totalDrives < 24) {
-      updateConfig(activeConfigIndex, { selectedDrives: [...activeConfig.selectedDrives, { id: Date.now(), size }] });
+      updateConfig(activeConfigIndex, { selectedDrives: [...activeConfig.selectedDrives, { id: Date.now(), size, type }] });
       setDriveCapHit(false);
     } else {
       setDriveCapHit(true);
@@ -239,7 +242,7 @@ const RAIDCalculator = () => {
     if (allDrives.length === 0) return;
     const dstTotal = dst.selectedDrives.length + dst.vdevs.reduce((s, v) => s + v.drives.length, 0);
     const slots = Math.max(0, 24 - dstTotal);
-    const newDrives = allDrives.slice(0, slots).map(drive => ({ id: Date.now() + Math.random(), size: drive.size }));
+    const newDrives = allDrives.slice(0, slots).map(drive => ({ id: Date.now() + Math.random(), size: drive.size, type: drive.type }));
     if (newDrives.length === 0) return;
     updateConfig(toIndex, { selectedDrives: [...dst.selectedDrives, ...newDrives] });
   };
@@ -335,9 +338,15 @@ const RAIDCalculator = () => {
   // Reliability -> color
   const reliabilityColor = (r: number) => r > 80 ? 'var(--ok)' : r > 50 ? 'var(--warn)' : 'var(--crit)';
 
+  const speedBarMax = (config: StorageConfig) => {
+    const allDrives = [...config.selectedDrives, ...config.vdevs.flatMap(v => v.drives)];
+    return allDrives.length > 0 && allDrives.every(d => d.type === 'nvme') ? 25000 : 1500;
+  };
+
   const renderStorageConfig = (config: StorageConfig, index: number, stats: ReturnType<typeof calculateStorage>) => {
     const accentColor = index === 0 ? 'var(--ok)' : 'var(--accent)';
     const efficiency = stats.total > 0 ? ((stats.available / stats.total) * 100) : 0;
+    const spdMax = speedBarMax(config);
 
     return (
       <div>
@@ -536,7 +545,7 @@ const RAIDCalculator = () => {
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)' }}>MB/s</div>
                   </div>
                   <div className="bar-track">
-                    <div className="bar-fill bar-fill--accent" style={{ width: `${Math.min(100, (stats.readSpeed / 1000) * 100)}%` }} />
+                    <div className="bar-fill bar-fill--accent" style={{ width: `${Math.min(100, (stats.readSpeed / spdMax) * 100)}%` }} />
                   </div>
                 </div>
                 {/* Write speed */}
@@ -547,7 +556,7 @@ const RAIDCalculator = () => {
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)' }}>MB/s</div>
                   </div>
                   <div className="bar-track">
-                    <div className="bar-fill bar-fill--ok" style={{ width: `${Math.min(100, (stats.writeSpeed / 1000) * 100)}%` }} />
+                    <div className="bar-fill bar-fill--ok" style={{ width: `${Math.min(100, (stats.writeSpeed / spdMax) * 100)}%` }} />
                   </div>
                 </div>
                 {/* Reliability */}
@@ -590,27 +599,94 @@ const RAIDCalculator = () => {
       <section style={{ marginBottom: '48px' }} className="rise rise-1">
         <div className="section-label">
           <span>Add Drives</span>
-          {(configs[activeConfigIndex].selectedDrives.length > 0 || configs[activeConfigIndex].vdevs.length > 0) && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)' }}>
-              click a bay to remove
-            </span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {(configs[activeConfigIndex].selectedDrives.length > 0 || configs[activeConfigIndex].vdevs.length > 0) && (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)' }}>
+                click a bay to remove
+              </span>
+            )}
+            {/* HDD / NVMe toggle */}
+            <div style={{
+              display: 'flex', gap: '2px',
+              background: 'var(--paper-3)', padding: '2px', borderRadius: '5px',
+              border: '1px solid var(--rule)',
+            }}>
+              <button
+                className={`media-tab ${driveMediaType === 'hdd' ? 'media-tab--hdd-active' : ''}`}
+                onClick={() => setDriveMediaType('hdd')}
+              >
+                HDD
+              </button>
+              <button
+                className={`media-tab ${driveMediaType === 'nvme' ? 'media-tab--nvme-active' : ''}`}
+                onClick={() => setDriveMediaType('nvme')}
+              >
+                NVMe
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Drive size buttons */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '20px' }}>
-          {driveSizes.map(size => (
-            <button key={size} className="drive-btn" onClick={() => addDrive(size)}>
-              {size} TB
+        {driveMediaType === 'hdd' ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '20px' }}>
+            {driveSizes.map(size => (
+              <button key={size} className="drive-btn" onClick={() => addDrive(size, 'hdd')}>
+                {size} TB
+              </button>
+            ))}
+            <button
+              className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
+              onClick={() => setShowComparisonMode(!showComparisonMode)}
+            >
+              {showComparisonMode ? '← Single' : 'Compare →'}
             </button>
-          ))}
-          <button
-            className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
-            onClick={() => setShowComparisonMode(!showComparisonMode)}
-          >
-            {showComparisonMode ? '← Single' : 'Compare →'}
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+            {/* Standard (full user-visible capacity) */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--nvme)', textTransform: 'uppercase', letterSpacing: '0.1em', minWidth: '60px' }}>
+                Standard
+              </span>
+              {nvmeSizesStandard.map(size => (
+                <button key={size} className="drive-btn drive-btn--nvme" onClick={() => addDrive(size, 'nvme')}>
+                  {formatDriveSize(size)}
+                </button>
+              ))}
+            </div>
+            {/* Enterprise / prosumer: ~6% over-provisioned, odd sizes */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span
+                style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', minWidth: '60px', cursor: 'help' }}
+                title="Over-provisioned: manufacturer reserves ~6% of NAND for wear leveling and garbage collection"
+              >
+                Ent. OP
+              </span>
+              {nvmeSizesEnterprise.map(size => {
+                const rawNand: Record<number, string> = {
+                  0.12: '128 GB', 0.24: '256 GB', 0.48: '512 GB', 0.96: '1 TB',
+                  1.92: '2 TB', 3.84: '4 TB', 7.68: '8 TB', 15.36: '16 TB',
+                };
+                return (
+                  <button key={size} className="drive-btn drive-btn--nvme" onClick={() => addDrive(size, 'nvme')}
+                    title={`${formatDriveSize(size)} user-visible · ${rawNand[size]} raw NAND (~6% over-provisioned)`}
+                  >
+                    {formatDriveSize(size)}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                className={`drive-btn ${showComparisonMode ? 'drive-btn--active' : ''}`}
+                onClick={() => setShowComparisonMode(!showComparisonMode)}
+              >
+                {showComparisonMode ? '← Single' : 'Compare →'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Comparison mode tabs */}
         {showComparisonMode && (

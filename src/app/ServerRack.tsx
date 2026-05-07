@@ -5,12 +5,18 @@ import React from 'react';
 interface Drive {
   id: number;
   size: number;
+  type?: 'hdd' | 'nvme';
 }
 
 interface ServerRackProps {
   drives: Drive[];
   onDriveClick: (id: number | null) => void;
   maxSlots?: number;
+}
+
+function formatSize(size: number): { value: string; unit: string } {
+  if (size < 1) return { value: String(Math.round(size * 1000)), unit: 'GB' };
+  return { value: String(size), unit: 'TB' };
 }
 
 const ServerRack: React.FC<ServerRackProps> = ({
@@ -21,6 +27,7 @@ const ServerRack: React.FC<ServerRackProps> = ({
   const drivesPerRow = 6;
   const rows = Math.ceil(maxSlots / drivesPerRow);
   const slots = Array.from({ length: maxSlots }, (_, i) => i);
+  const hasNvme = drives.some(d => d.type === 'nvme');
 
   return (
     <div style={{
@@ -42,27 +49,28 @@ const ServerRack: React.FC<ServerRackProps> = ({
         marginBottom: '10px',
         border: '1px solid var(--rule)',
       }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <div style={{ width: 18, height: 28, background: 'var(--rule)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 10, height: 10, background: '#1a73e8', borderRadius: '1px' }} />
-          </div>
-          <div style={{ width: 18, height: 28, background: 'var(--rule)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 10, height: 10, background: '#1a73e8', borderRadius: '1px' }} />
-          </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+          SRV-R2502 · 4U
         </div>
 
         <div style={{ display: 'flex', gap: '14px' }}>
-          {[['PWR', 'var(--ok)'], ['NET', 'var(--ok)'], ['HDD', drives.length > 0 ? 'var(--ok)' : 'var(--ink-3)']].map(([label, color]) => (
-            <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: color as string, boxShadow: drives.length > 0 ? `0 0 6px ${color}` : 'none' }} />
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--ink-3)', letterSpacing: '0.05em' }}>{label}</span>
+          {[
+            ['PWR', 'var(--ok)', true],
+            ['NET', 'var(--ok)', true],
+            ['HDD', drives.some(d => !d.type || d.type === 'hdd') ? 'var(--ok)' : 'var(--ink-3)', drives.some(d => !d.type || d.type === 'hdd')],
+            ['NVMe', hasNvme ? 'var(--nvme)' : 'var(--ink-3)', hasNvme],
+          ].map(([label, color, active]) => (
+            <div key={label as string} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: color as string,
+                boxShadow: active ? `0 0 6px ${color}` : 'none',
+              }} />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', color: 'var(--ink-3)', letterSpacing: '0.05em' }}>{label as string}</span>
             </div>
           ))}
         </div>
 
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
-          SRV-R2502 · 4U
-        </div>
       </div>
 
       {/* Drive bays */}
@@ -71,6 +79,13 @@ const ServerRack: React.FC<ServerRackProps> = ({
           <div key={rowIndex} style={{ display: 'grid', gridTemplateColumns: `repeat(${drivesPerRow}, 1fr)`, gap: '6px' }}>
             {slots.slice(rowIndex * drivesPerRow, (rowIndex + 1) * drivesPerRow).map((slotIndex) => {
               const drive = drives.find((_, i) => i === slotIndex);
+              const isNvme = drive?.type === 'nvme';
+              const { value, unit } = drive ? formatSize(drive.size) : { value: '', unit: '' };
+
+              const activeBorder = isNvme ? '1px solid rgba(0,212,255,0.45)' : '1px solid var(--rule)';
+              const activeBg = isNvme ? 'rgba(0,10,18,0.95)' : 'var(--paper-2)';
+              const ledColor = isNvme ? 'var(--nvme)' : 'var(--ok)';
+
               return (
                 <div
                   key={slotIndex}
@@ -80,35 +95,53 @@ const ServerRack: React.FC<ServerRackProps> = ({
                     aspectRatio: '3/1',
                     borderRadius: '3px',
                     overflow: 'hidden',
-                    border: drive
-                      ? '1px solid var(--rule)'
-                      : '1px dashed rgba(54,45,89,0.6)',
-                    background: drive ? 'var(--paper-2)' : 'var(--paper-3)',
+                    border: drive ? activeBorder : '1px dashed rgba(54,45,89,0.6)',
+                    background: drive ? activeBg : 'var(--paper-3)',
                     cursor: drive ? 'pointer' : 'default',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
                   onMouseEnter={e => {
                     if (drive) {
-                      (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--crit)';
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 8px rgba(250,127,170,0.25)';
+                      const el = e.currentTarget as HTMLDivElement;
+                      el.style.borderColor = isNvme ? 'var(--nvme)' : 'var(--crit)';
+                      el.style.boxShadow = isNvme
+                        ? '0 0 8px rgba(0,212,255,0.3)'
+                        : '0 0 8px rgba(250,127,170,0.25)';
                     }
                   }}
                   onMouseLeave={e => {
                     if (drive) {
-                      (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--rule)';
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+                      const el = e.currentTarget as HTMLDivElement;
+                      el.style.borderColor = isNvme ? 'rgba(0,212,255,0.45)' : 'var(--rule)';
+                      el.style.boxShadow = 'none';
                     }
                   }}
                 >
                   {drive && (
-                    <div style={{ position: 'absolute', inset: 0, opacity: 0.12 }}>
-                      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                        <pattern id={`hc-${drive.id}`} patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="scale(0.5)">
-                          <rect width="100%" height="100%" fill="none" />
-                          <path d="M0,5 L2.5,0 L7.5,0 L10,5 L7.5,10 L2.5,10 Z" fill="var(--ok)" />
-                        </pattern>
-                        <rect width="100%" height="100%" fill={`url(#hc-${drive.id})`} />
-                      </svg>
+                    <div style={{ position: 'absolute', inset: 0, opacity: isNvme ? 0.18 : 0.12 }}>
+                      {isNvme ? (
+                        /* NVMe: circuit trace grid pattern */
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id={`nv-${drive.id}`} patternUnits="userSpaceOnUse" width="8" height="6">
+                              <rect x="0.5" y="1" width="7" height="4" fill="none" stroke="var(--nvme)" strokeWidth="0.6" rx="0.5" />
+                              <rect x="2" y="2.5" width="4" height="1" fill="var(--nvme)" rx="0.3" />
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill={`url(#nv-${drive.id})`} />
+                        </svg>
+                      ) : (
+                        /* HDD: honeycomb pattern */
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id={`hc-${drive.id}`} patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="scale(0.5)">
+                              <rect width="100%" height="100%" fill="none" />
+                              <path d="M0,5 L2.5,0 L7.5,0 L10,5 L7.5,10 L2.5,10 Z" fill="var(--ok)" />
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill={`url(#hc-${drive.id})`} />
+                        </svg>
+                      )}
                     </div>
                   )}
 
@@ -122,18 +155,27 @@ const ServerRack: React.FC<ServerRackProps> = ({
                           fontFamily: 'var(--mono)',
                           fontSize: '11px',
                           fontWeight: 500,
-                          color: 'var(--ink-2)',
-                          background: 'rgba(21,15,35,0.75)',
+                          color: isNvme ? 'var(--nvme)' : 'var(--ink-2)',
+                          background: isNvme ? 'rgba(0,8,14,0.82)' : 'rgba(21,15,35,0.75)',
                           padding: '2px 6px',
                           borderRadius: '2px',
                           letterSpacing: '0.03em',
                         }}>
-                          {drive.size}<span style={{ fontSize: '9px', color: 'var(--ink-3)', marginLeft: '1px' }}>TB</span>
+                          {value}<span style={{ fontSize: '9px', color: isNvme ? 'rgba(0,212,255,0.6)' : 'var(--ink-3)', marginLeft: '1px' }}>{unit}</span>
                         </span>
                       </div>
                       <div style={{ position: 'absolute', top: 3, right: 4 }}>
-                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--ok)', boxShadow: '0 0 4px var(--ok)' }} />
+                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: ledColor, boxShadow: `0 0 4px ${ledColor}` }} />
                       </div>
+                      {isNvme && (
+                        <div style={{
+                          position: 'absolute', bottom: 2, left: 4,
+                          fontFamily: 'var(--mono)', fontSize: '7px',
+                          color: 'rgba(0,212,255,0.45)', letterSpacing: '0.06em',
+                        }}>
+                          M.2
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div style={{
@@ -161,6 +203,16 @@ const ServerRack: React.FC<ServerRackProps> = ({
       }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--ink-3)' }}>
           {drives.length}/{maxSlots} bays occupied
+          {drives.some(d => !d.type || d.type === 'hdd') && (
+            <span style={{ color: 'var(--ok)', marginLeft: '8px' }}>
+              {drives.filter(d => !d.type || d.type === 'hdd').length} HDD
+            </span>
+          )}
+          {hasNvme && (
+            <span style={{ color: 'var(--nvme)', marginLeft: '8px' }}>
+              {drives.filter(d => d.type === 'nvme').length} NVMe
+            </span>
+          )}
         </span>
         <div style={{ display: 'flex', gap: '6px' }}>
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--warn)' }} />
