@@ -308,6 +308,14 @@ const RAIDCalculator = () => {
 
   const configStats = configs.map(calculateStorage);
 
+  const getConfigLabel = (config: StorageConfig) => {
+    if (config.fileSystem === 'ZFS' && config.vdevs.length > 0) {
+      const counts = config.vdevs.reduce((acc, v) => ({ ...acc, [v.type]: (acc[v.type] || 0) + 1 }), {} as Record<string, number>);
+      return `ZFS · ${Object.entries(counts).map(([type, n]) => `${n}× ${type}`).join(', ')}`;
+    }
+    return `${config.fileSystem} · ${config.raidType}`;
+  };
+
   const comparisonResult = useMemo(() => {
     if (!showComparisonMode) return null;
     const [s1, s2] = configStats;
@@ -613,7 +621,7 @@ const RAIDCalculator = () => {
                 className={`tab-btn ${activeConfigIndex === index ? 'active' : ''}`}
                 onClick={() => setActiveConfigIndex(index)}
               >
-                Config {index + 1}: {config.fileSystem} {config.raidType}
+                Config {index + 1}: {getConfigLabel(config)}
               </button>
             ))}
           </div>
@@ -678,7 +686,7 @@ const RAIDCalculator = () => {
                   <div style={{ fontFamily: 'var(--display)', fontSize: '22px', fontWeight: 800, color: index === 0 ? 'var(--ok)' : 'var(--accent)', marginBottom: '16px' }}>
                     Config {index + 1}
                     <span style={{ fontFamily: 'var(--sans)', fontSize: '13px', fontWeight: 400, color: 'var(--ink-3)', marginLeft: '10px' }}>
-                      {config.fileSystem} · {config.raidType}
+                      {getConfigLabel(config)}
                     </span>
                   </div>
                   {renderStorageConfig(config, index, configStats[index])}
