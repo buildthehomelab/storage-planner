@@ -30,12 +30,12 @@ Single-page Next.js 14 app (App Router). All logic lives in `src/app/`.
 **`page.tsx`** — The entire application. Contains:
 - `RAIDCalculator` (default export): root component managing all state
 - `StorageConfig` state: array of two configs `{ fileSystem, raidType, selectedDrives, vdevs }` enabling comparison mode
-- Drive selection: max 16 drives per config, sizes 1–30 TB
+- Drive selection: max 24 drives per config, sizes 1–30 TB
 - `calculateStorage()` / `calculateVdevStorage()`: pure functions computing usable capacity, protection, read/write speed estimates, and reliability score (0–100) from RAID type
 - ZFS vdev workflow: drives first added to `selectedDrives`, then grouped into vdevs via `createVdev()` — vdev removal returns drives to `selectedDrives`
 - Comparison mode: two configs evaluated side-by-side across 5 metrics (capacity, efficiency, read/write speed, reliability)
 
-**`ServerRack.tsx`** — Visual 4×4 grid of drive bays. Occupied bays show honeycomb SVG + TB label; empty bays show dashed border. Clicking a drive calls `onDriveClick(id)` to remove it.
+**`ServerRack.tsx`** — Visual 6×4 grid of drive bays (24 slots). Occupied bays show honeycomb SVG + TB label; empty bays show dashed border. Clicking a drive calls `onDriveClick(id)` to remove it.
 
 **`VdevRack.tsx`** — Same visual style as ServerRack but read-only; renders drives belonging to a committed ZFS vdev.
 
@@ -43,7 +43,7 @@ Single-page Next.js 14 app (App Router). All logic lives in `src/app/`.
 
 ## Key domain constraints
 
-- Drive cap: 16 drives per config (`selectedDrives.length < 16` in `addDrive`)
+- Drive cap: 24 drives per config (total of `selectedDrives` + all vdev drives; enforced in `addDrive`)
 - ZFS vdev pool: stripes across vdevs (RAID-0 between vdevs), so pool fails if any single vdev fails
 - Storage calc uses drive count × base speed × efficiency factor; values are estimates, not benchmarks
 - SnapRAID: largest drives become parity; data drives get full capacity
