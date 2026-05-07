@@ -17,10 +17,7 @@ const nextConfig = {
     assetPrefix: '/storage-planner/',
   }),
   
-  // For regular Next.js deployment
-  experimental: {
-    outputFileTracingRoot: process.env.NODE_ENV === 'production' ? undefined : __dirname,
-  },
+  outputFileTracingRoot: __dirname,
 }
 
 module.exports = nextConfig
